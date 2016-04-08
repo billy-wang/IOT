@@ -57,6 +57,7 @@
 #include "gapbondmgr.h"
 #include "simpleGATTprofile.h"
 #include "simpleBLECentral.h"
+#include "npi.h"
 
 /*********************************************************************
  * MACROS
@@ -219,6 +220,7 @@ static uint8 simpleBLECentralEventCB( gapCentralRoleEvent_t *pEvent );
 static void simpleBLECentralPasscodeCB( uint8 *deviceAddr, uint16 connectionHandle,
                                         uint8 uiInputs, uint8 uiOutputs );
 static void simpleBLECentralPairStateCB( uint16 connHandle, uint8 state, uint8 status );
+static void NpiSerialCentralCB( uint8 port, uint8 events );
 static void simpleBLECentral_HandleKeys( uint8 shift, uint8 keys );
 static void simpleBLECentral_ProcessOSALMsg( osal_event_hdr_t *pMsg );
 static void simpleBLEGATTDiscoveryEvent( gattMsgEvent_t *pMsg );
@@ -244,6 +246,35 @@ static const gapBondCBs_t simpleBLEBondCB =
   simpleBLECentralPasscodeCB,
   simpleBLECentralPairStateCB
 };
+
+// Npi Serial Callbacks
+static void NpiSerialCentralCB( uint8 port, uint8 events )
+{
+	if (events & (HAL_UART_RX_TIMEOUT | HAL_UART_RX_FULL))
+	{
+		uint8 numBytes = 0;
+
+		numBytes = NPI_RxBufLen();
+
+		if(numBytes == 0)
+		{
+			return;
+		}
+		else
+		{
+			uint8 *buffer = osal_mem_alloc(numBytes);
+			if(buffer)
+			{
+				NPI_ReadTransport(buffer,numBytes);
+
+				//The received data is sent to a serial port to realize the loopback
+				NPI_WriteTransport(buffer, numBytes);
+
+				osal_mem_free(buffer);
+			}
+		}
+	}
+}
 
 /*********************************************************************
  * PUBLIC FUNCTIONS
@@ -310,6 +341,16 @@ void SimpleBLECentral_Init( uint8 task_id )
   
   // Setup a delayed profile startup
   osal_set_event( simpleBLETaskId, START_DEVICE_EVT );
+
+	// Initialize uart
+	NPI_InitTransport(NpiSerialCentralCB);
+	NPI_WriteTransport("SimpleBLECentral_Init\r\n", 23);
+	NPI_PrintString("SimpleBLECentral_Init2\r\n");
+
+	NPI_PrintValue("Serial print value decimal= ", 168, 10);
+	NPI_PrintString("\r\n");
+	NPI_PrintValue("Serial print value hexadecimal = 0x", 0x88, 16);
+	NPI_PrintString("\r\n");
 }
 
 /*********************************************************************

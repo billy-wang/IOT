@@ -47,6 +47,7 @@
 #include "hal_types.h"
 #include "hal_board.h"
 #include "npi.h"
+#include "OSAL.h"
 
 /*******************************************************************************
  * MACROS
@@ -221,6 +222,61 @@ uint16 NPI_GetMaxRxBufSize( void )
 uint16 NPI_GetMaxTxBufSize( void )
 {
   return( NPI_UART_TX_BUF_SIZE );
+}
+
+
+/*******************************************************************************
+ * @fn 			 NPI_PrintString
+ *
+ * @brief			 This routine print string.
+ *
+ * input parameters
+ *
+ * @param       buf - Pointer to buffer to write data from.
+ *
+ * output parameters
+ *
+ * @param       None.
+ *
+ * @return		 None.
+ *
+ */
+void NPI_PrintString(uint8 *buf)
+{
+	NPI_WriteTransport(buf, osal_strlen((char*)buf));
+}
+
+
+/*******************************************************************************
+ * @fn 			 NPI_PrintValue
+ *
+ * @brief			 This routine print the format of the specified value.
+ *
+ * input parameters
+ *
+ * @param       title 	  -  print the prefix string.
+ * @param       value   -  print the value.
+ * @param       format  - print the format of the value (decimal or hexadecimal).
+ *
+ * output parameters
+ *
+ * @param       None.
+ *
+ * @return		 None.
+ *
+ */
+void NPI_PrintValue(char *title, uint16 value, uint8 format)
+{
+  uint8 tmpLen;
+  uint8 buf[128];
+  uint32 err;
+
+  tmpLen = (uint8)osal_strlen( (char*)title );
+  osal_memcpy( buf, title, tmpLen );
+  buf[tmpLen] = ' ';
+  err = (uint32)(value);
+  _ltoa( err, &buf[tmpLen+1], format );
+  NPI_PrintString(buf);
 }
 
 
