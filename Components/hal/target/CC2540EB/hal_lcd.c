@@ -321,6 +321,9 @@ void HalLcdWriteString ( char *str, uint8 option)
     }
   }
 
+	NPI_WriteTransport(str, (uint8)osal_strlen( (char*)str));
+	NPI_PrintString("\r\n");
+
   /* Display the string */
   HalLcd_HW_WriteLine (option, str);
 
