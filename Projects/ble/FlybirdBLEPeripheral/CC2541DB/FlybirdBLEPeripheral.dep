@@ -1,0 +1,1219 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+
+<project>
+  <fileVersion>2</fileVersion>
+  <fileChecksum>3825012217</fileChecksum>
+  <configuration>
+    <name>CC2541</name>
+    <outputs/>
+    <forcedrebuild>
+      <name>[MULTI_TOOL]</name>
+      <tool>XLINK</tool>
+    </forcedrebuild>
+    <forcedrebuild>
+      <name>[REBUILD_ALL]</name>
+    </forcedrebuild>
+  </configuration>
+  <configuration>
+    <name>CC2541-OAD-Encrypted-ImgA</name>
+    <outputs/>
+    <forcedrebuild>
+      <name>[MULTI_TOOL]</name>
+      <tool>XLINK</tool>
+    </forcedrebuild>
+    <forcedrebuild>
+      <name>[REBUILD_ALL]</name>
+    </forcedrebuild>
+  </configuration>
+  <configuration>
+    <name>CC2541-OAD-Encrypted-ImgB</name>
+    <outputs/>
+    <forcedrebuild>
+      <name>[MULTI_TOOL]</name>
+      <tool>XLINK</tool>
+    </forcedrebuild>
+    <forcedrebuild>
+      <name>[REBUILD_ALL]</name>
+    </forcedrebuild>
+  </configuration>
+  <configuration>
+    <name>CC2541-OAD-ImgA</name>
+    <outputs/>
+    <forcedrebuild>
+      <name>[MULTI_TOOL]</name>
+      <tool>XLINK</tool>
+    </forcedrebuild>
+    <forcedrebuild>
+      <name>[REBUILD_ALL]</name>
+    </forcedrebuild>
+  </configuration>
+  <configuration>
+    <name>CC2541-OAD-ImgB</name>
+    <outputs/>
+    <forcedrebuild>
+      <name>[MULTI_TOOL]</name>
+      <tool>XLINK</tool>
+    </forcedrebuild>
+    <forcedrebuild>
+      <name>[REBUILD_ALL]</name>
+    </forcedrebuild>
+  </configuration>
+  <configuration>
+    <name>FlybirdLaboratory Health</name>
+    <outputs>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_ClockBLE.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gap.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_Memory.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_PwrMgr.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gapbondmgr.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gattservapp_util.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gatt_uuid.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\simplekeys.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\peripheral.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\simpleGATTprofile.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OnBoard.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\flybirdBLEPeripheral.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\FlybirdBLEPeripheral_Main.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_FlybirdBLEPeripheral.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gatt_uuid.pbi</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\OSAL.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\osal_cbtimer.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_aes.r51</file>
+      <file>$TOOLKIT_DIR$\inc\ioCC2541.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\osal_snv.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_flash.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_adc.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\FlybirdBLEPeripheral.pbd</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_Memory.pbi</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\OSAL_Memory.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_aes.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_drivers.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_adc.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_dma.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_flash.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_key.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_lcd.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_led.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_sleep.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_startup.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\npi.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_timer.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_uart.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_dma.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_sleep.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_drivers.r51</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\controller\CC254x\include\ll_sleep.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\OSAL_Tasks.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\osal_snv.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\osal_cbtimer.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\hci\hci_tl.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\hci\hci_data.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\hci\hci_event.h</file>
+      <file>$PROJ_DIR$\..\..\common\cc2540\ti_51ew_cc2540b.xcl</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_FlybirdBLEPeripheral.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\FlybirdBLEPeripheral_Main.r51</file>
+      <file>$TOOLKIT_DIR$\inc\clib\limits.h</file>
+      <file>$TOOLKIT_DIR$\inc\clib\sysmac.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_key.r51</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\OSAL_Timers.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_lcd.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OnBoard.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_led.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\npi.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_uart.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\osal_bufmgr.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\osal_cbtimer.r51</file>
+      <file>$PROJ_DIR$\..\Source\flybirdBLEPeripheral.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\common\hal_drivers.c</file>
+      <file>$PROJ_DIR$\..\Source\flybirdBLEPeripheral.h</file>
+      <file>$PROJ_DIR$\..\Source\FlybirdBLEPeripheral_Main.c</file>
+      <file>$PROJ_DIR$\..\Source\OSAL_FlybirdBLEPeripheral.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_assert.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_board.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_adc.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_lcd.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_defs.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_drivers.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_flash.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_sleep.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_key.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_led.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_rpc.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_timer.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_adc.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_uart.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\services\saddr\saddr.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_sleep.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_board_cfg.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_aes.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_crc.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_dma.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_flash.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_key.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_lcd.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_led.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_startup.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\include\gatt_uuid.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_timer.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_uart.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_aes.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_ccm.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_crc.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_dma.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_mcu.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_types.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\include\att.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\include\gap.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\include\gatt.h</file>
+      <file>$PROJ_DIR$\..\..\Libraries\CC2541DB\bin\CC2541_BLE_peri.lib</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\include\l2cap.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\include\hci.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\host\linkdb.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\controller\CC254x\include\ll.h</file>
+      <file>$PROJ_DIR$\..\..\common\npi\npi_np\npi.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\controller\CC254x\include\phy.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\include\sm.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\common\osal_bufmgr.c</file>
+      <file>$PROJ_DIR$\..\..\common\npi\npi_np\npi.c</file>
+      <file>$PROJ_DIR$\..\..\Libraries\Common\bin\CC254x_BLE_HCI_TL_None.lib</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\include\bcomdef.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\common\osal_cbtimer.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\DevInfo\devinfoservice.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_ClockBLE.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_Memory.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_PwrMgr.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\mcu\cc2540\osal_snv.c</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_Timers.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\Roles\gap.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\DevInfo\devinfoservice.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\Roles\gapbondmgr.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\Roles\gapbondmgr.h</file>
+      <file>$PROJ_DIR$\..\..\Include\gapgattserver.h</file>
+      <file>$PROJ_DIR$\..\..\Include\gattservapp.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\host\gatt_uuid.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\OAD\oad.h</file>
+      <file>$PROJ_DIR$\..\..\Profiles\GATT\gattservapp_util.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\OAD\oad_target.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\OAD\oad_target.h</file>
+      <file>$PROJ_DIR$\..\..\Profiles\SimpleProfile\simpleGATTprofile.h</file>
+      <file>$PROJ_DIR$\..\..\Profiles\Roles\CC254x\peripheral.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\Roles\CC254x\peripheral.h</file>
+      <file>$PROJ_DIR$\..\..\Profiles\SimpleProfile\CC254x\simpleGATTprofile.c</file>
+      <file>$PROJ_DIR$\..\..\Profiles\Keys\simplekeys.h</file>
+      <file>$PROJ_DIR$\..\..\config\buildComponents.cfg</file>
+      <file>$PROJ_DIR$\..\..\Profiles\Keys\CC254x\simplekeys.c</file>
+      <file>$PROJ_DIR$\..\..\common\cc2540\OnBoard.c</file>
+      <file>$PROJ_DIR$\buildConfig.cfg</file>
+      <file>$PROJ_DIR$\..\..\common\cc2540\OnBoard.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_crc.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_crc.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_crc.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Exe\FlybirdBLEPeripheral.d51</file>
+      <file>$TOOLKIT_DIR$\inc\clib\string.h</file>
+      <file>$PROJ_DIR$\..\..\Include\gatt_profile_uuid.h</file>
+      <file>$TOOLKIT_DIR$\inc\clib\stdlib.h</file>
+      <file>$TOOLKIT_DIR$\lib\clib\cl-pli-blxd-1e16x01.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Exe\FlybirdBLEPeripheral.hex</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\List\FlybirdBLEPeripheral.map</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\flybirdBLEPeripheral.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_timer.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_startup.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL.pbi</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\OSAL_Clock.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\osal_bufmgr.h</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\controller\CC254x\include\ll_timer2.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gap.pbi</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\ble\controller\CC254x\include\ll_math.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_ClockBLE.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\osal_cbtimer.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gapbondmgr.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\osal_bufmgr.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\osal_snv.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OnBoard.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\flybirdBLEPeripheral.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\peripheral.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gattservapp_util.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_FlybirdBLEPeripheral.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\simplekeys.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\simpleGATTprofile.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_Timers.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\simplekeys.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\devinfoservice.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_led.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\peripheral.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\simpleGATTprofile.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\devinfoservice.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_uart.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_timer.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_PwrMgr.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gapbondmgr.__cstat.et</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\OSAL_PwrMgr.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gap.__cstat.et</file>
+      <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\comdef.h</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gatt_uuid.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_startup.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\osal_bufmgr.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_lcd.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_flash.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_Memory.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\gattservapp_util.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_aes.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_ClockBLE.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_sleep.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\FlybirdBLEPeripheral_Main.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_dma.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\npi.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_drivers.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_PwrMgr.pbi</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_adc.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\hal_key.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_Timers.__cstat.et</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\devinfoservice.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\OSAL_Timers.r51</file>
+      <file>$PROJ_DIR$\FlybirdLaboratory Health\Obj\osal_snv.r51</file>
+    </outputs>
+    <file>
+      <name>[ROOT_NODE]</name>
+      <outputs>
+        <tool>
+          <name>XLINK</name>
+          <file> 150 156 155</file>
+        </tool>
+      </outputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Source\flybirdBLEPeripheral.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 11</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 157</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 172</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 191 129 105 15 71 120 102 189 77 130 111 55 101 19 85 103 69 146 78 72 108 131 137 139 66 73 52 25 53 76 70 117 82 107 110 104 113</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 117 191 102 73 15 52 53 25 55 189 146 101 19 76 71 70 85 78 77 72 105 103 107 108 110 69 130 131 120 137 111 82 139 129 104 113 66</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\common\hal_drivers.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 27</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 41</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 205</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 102 55 97 72 189 70 101 19 74 76 15 85 191 100 77 78 80 82 73 71 52 25 53</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 71 102 70 85 101 73 19 97 100 74 77 72 78 76 80 82 15 52 53 191 25 55 189</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Source\FlybirdBLEPeripheral_Main.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 12</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 51</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 202</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 191 44 78 70 80 43 73 102 19 77 74 15 189 146 85 101 55 76 52 25 53</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 102 77 70 85 101 73 19 80 74 78 15 52 53 191 25 55 43 189 44 146 76</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\Source\OSAL_FlybirdBLEPeripheral.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 13</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 50</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 175</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 107 52 110 105 53 73 82 43 130 139 25 117 69 70 15 103 74 46 45 104 129 131 66 191 55 102 108 48 19 47 85 101 113</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 102 15 52 53 191 73 25 55 43 74 110 117 46 108 69 82 70 85 101 19 47 48 45 107 104 113 130 129 105 103 131 139 66</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_adc.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 28</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 22</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 207</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 101 73 102 85 70 19 71</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 71 102 70 85 101 73 19</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_sleep.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 34</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 40</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 201</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 102 43 78 42 73 70 15 74 165 85 25 101 76 77 55 189 69 163 19 52 53 191 117</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 102 101 73 19 70 85 76 78 77 15 52 53 191 25 55 43 189 74 69 42 117 163 165</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_aes.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 26</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 18</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 199</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 191 85 102 100 55 101 73 97 52 25 53 70 19 15</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 15 52 53 191 102 73 25 55 97 100 70 85 101 19</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_crc.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 148</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 147</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 149</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 73 85 101 102 19 70 99</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 70 85 101 73 102 19 99</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_dma.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 29</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 39</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 203</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 73 19 102 101 82 70 85 100</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 100 70 85 101 73 102 19 82</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_flash.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 30</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 21</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 196</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 101 73 75 102 85 100 19 70</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 85 101 73 102 19 100 70 75</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_key.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 31</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 54</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 208</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 70 52 71 102 15 73 101 53 74 77 19 85 25 191 55</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 101 73 102 19 74 71 70 85 77 15 52 53 191 25 55</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_lcd.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 32</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 56</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 195</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 102 69 73 19 15 70 55 72 146 85 101 191 52 25 53 76</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 102 72 70 85 101 73 19 15 52 53 191 25 55 146 76 69</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_led.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 33</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 58</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 181</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 52 78 102 70 73 101 53 74 15 19 85 25 191 55</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 101 73 102 19 74 78 70 85 15 52 53 191 25 55</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_startup.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 35</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 159</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 193</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 73 85 101 102 19 70</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 70 85 101 73 102 19</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_timer.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 37</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 158</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 186</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2540Flybird\hal_uart.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 38</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 60</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 185</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 70 55 82 74 15 73 102 19 191 189 101 85 52 25 53</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 85 101 73 102 19 74 82 70 15 52 53 191 25 55 189</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\osal_bufmgr.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 169</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 62</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 194</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 102 73 52 162 25 146 191 55 53 76 15 101 19</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 15 52 53 191 102 73 25 55 146 101 19 76 162</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\common\npi\npi_np\npi.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 36</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 59</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 204</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 19 73 102 111 25 53 70 15 85 101 52 82 191 55</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 102 70 85 101 73 19 111 82 15 52 53 191 25 55</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 160</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 61</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 16</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 25 146 43 101 102 70 189 73 191 15 161 74 85 52 53 76 151 19 55</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 151 53 191 102 73 70 85 101 19 15 52 25 55 43 189 161 146 76 74</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\osal_cbtimer.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 167</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 63</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 17</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 25 191 101 52 73 43 45 55 53 15 102 19 117</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 15 52 53 191 102 73 25 55 43 101 19 45 117</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_ClockBLE.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 166</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 0</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 200</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 53 76 15 52 146 102 73 25 191 161 101 19 55</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 191 102 73 146 101 19 76 15 52 53 25 55 161</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_Memory.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 24</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 2</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 197</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 146 191 15 69 102 55 101 19 25 53 73 52 76 153</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 153 53 191 102 73 15 52 25 55 146 101 19 76 69</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_PwrMgr.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 206</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 3</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 187</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 191 189 15 146 43 73 101 102 19 55 76 52 25 53</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 191 102 73 146 101 19 76 15 52 53 25 55 43 189</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\osal\mcu\cc2540\osal_snv.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 170</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 212</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 20</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 102 15 73 19 191 69 75 44 83 70 85 101 55 71 52 25 53</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 71 102 70 85 101 73 19 75 191 15 52 53 25 55 44 69 83</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_Timers.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 178</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 211</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 209</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 101 19 80 73 102 15 25 146 55 76 52 53 191 70 85</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 191 102 73 146 101 19 76 15 52 53 25 55 80 70 85</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\Profiles\Roles\gap.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 164</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 1</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 190</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 25 15 113 102 104 191 73 117 52 53 55</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 117 191 102 73 104 15 52 53 25 55 113</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\Profiles\DevInfo\devinfoservice.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 180</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 210</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 184</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 191 52 94 73 53 15 117 103 131 25 105 152 120 102 55 107</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 117 191 102 73 15 52 53 25 55 103 107 105 94 152 131 120</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\Profiles\Roles\gapbondmgr.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 168</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 4</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 188</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 117 191 102 73 15 52 53 25 55 44 104 113 109 105 103 107 94 108 110 69 131 130 129</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\..\Components\ble\host\gatt_uuid.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 14</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 6</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 192</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 102 55 191 117 105 103 15 94 73 52 25 53 107</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 191 102 73 15 52 53 25 55 105 117 103 107 94</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\Profiles\GATT\gattservapp_util.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 174</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 5</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 198</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 102 15 25 117 105 52 53 109 131 191 73 103 55 107</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 117 191 102 73 109 105 15 52 53 25 55 103 107 131</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\Profiles\Roles\CC254x\peripheral.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 173</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 8</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 182</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 15 44 102 104 191 110 46 103 129 55 47 117 85 107 109 105 139 73 52 25 53 108 82 48 69 101 70 19 113</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 117 191 102 73 15 52 53 25 55 46 108 110 69 82 70 85 101 19 47 48 107 104 113 109 103 105 44 139 129</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\Profiles\SimpleProfile\CC254x\simpleGATTprofile.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 177</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 9</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 183</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 104 117 129 103 25 15 94 191 73 52 53 113 109 105 131 137 102 55 107 151</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 151 53 117 191 102 73 15 52 25 55 109 103 107 105 94 131 129 104 113 137</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\Profiles\Keys\CC254x\simplekeys.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 176</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 7</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 179</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 15 141 105 117 109 131 191 25 104 103 94 129 73 52 53 113 102 55 107</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 117 191 102 73 15 52 53 25 55 109 103 107 105 94 131 129 104 113 141</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\common\cc2540\OnBoard.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 57</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 10</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 171</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 76 78 102 15 73 25 85 146 77 191 101 19 52 53 70 117 55</file>
+        </tool>
+        <tool>
+          <name>ICC8051</name>
+          <file> 142 145 117 191 102 73 146 101 19 76 15 52 53 25 55 78 70 85 77</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\FlybirdLaboratory Health\Exe\FlybirdBLEPeripheral.d51</name>
+      <outputs>
+        <tool>
+          <name>XLINK</name>
+          <file> 156 155</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>XLINK</name>
+          <file> 49 106 116 210 157 51 1 4 6 5 22 18 147 39 41 21 54 56 58 40 159 158 60 59 10 61 62 63 0 50 2 3 212 211 8 9 7 154</file>
+        </tool>
+      </inputs>
+    </file>
+    <forcedrebuild>
+      <name>$PROJ_DIR$\..\..\Profiles\OAD\oad_target.c</name>
+      <tool>ICC8051</tool>
+    </forcedrebuild>
+  </configuration>
+</project>
+
+
