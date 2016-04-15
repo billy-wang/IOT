@@ -11,6 +11,6 @@
 #define HAL_LCD TRUE
 #define HAL_LED TRUE
 #define HAL_KEY TRUE
-//#define HAL_UART TRUE
+#define HAL_UART TRUE
 
 #endif

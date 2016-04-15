@@ -153,27 +153,27 @@ static uint8 devInfoSystemId[DEVINFO_SYSTEM_ID_LEN] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 // Model Number String characteristic
 static uint8 devInfoModelNumberProps = GATT_PROP_READ;
-static const uint8 devInfoModelNumber[] = "Model Number";
+static const uint8 devInfoModelNumber[] = "Flybird health";
 
 // Serial Number String characteristic
 static uint8 devInfoSerialNumberProps = GATT_PROP_READ;
-static const uint8 devInfoSerialNumber[] = "Serial Number";
+static const uint8 devInfoSerialNumber[] = "00117";
 
 // Firmware Revision String characteristic
 static uint8 devInfoFirmwareRevProps = GATT_PROP_READ;
-static const uint8 devInfoFirmwareRev[] = "Firmware Revision";
+static const uint8 devInfoFirmwareRev[] = "V1.4.1";
 
 // Hardware Revision String characteristic
 static uint8 devInfoHardwareRevProps = GATT_PROP_READ;
-static const uint8 devInfoHardwareRev[] = "Hardware Revision";
+static const uint8 devInfoHardwareRev[] = "1.8.1";
 
 // Software Revision String characteristic
 static uint8 devInfoSoftwareRevProps = GATT_PROP_READ;
-static const uint8 devInfoSoftwareRev[] = "Software Revision";
+static const uint8 devInfoSoftwareRev[] = "V1.4.1";
 
 // Manufacturer Name String characteristic
 static uint8 devInfoMfrNameProps = GATT_PROP_READ;
-static const uint8 devInfoMfrName[] = "Manufacturer Name";
+static const uint8 devInfoMfrName[] = "FlybirdLaboratory";
 
 // IEEE 11073-20601 Regulatory Certification Data List characteristic
 static uint8 devInfo11073CertProps = GATT_PROP_READ;

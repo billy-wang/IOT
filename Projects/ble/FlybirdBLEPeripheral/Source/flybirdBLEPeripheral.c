@@ -61,7 +61,7 @@
 #include "simpleGATTprofile.h"
 #include "npi.h"
 
-#if defined( CC2540_MINIDK )
+#if (defined HAL_KEY) && (HAL_KEY == TRUE)
   #include "simplekeys.h"
 #endif
 
@@ -93,11 +93,12 @@
 // Limited discoverable mode advertises for 30.72s, and then stops
 // General discoverable mode advertises indefinitely
 
-#if defined ( CC2540_MINIDK )
+#if (defined HAL_KEY) && (HAL_KEY == TRUE)
 #define DEFAULT_DISCOVERABLE_MODE             GAP_ADTYPE_FLAGS_LIMITED
 #else
 #define DEFAULT_DISCOVERABLE_MODE             GAP_ADTYPE_FLAGS_GENERAL
-#endif  // defined ( CC2540_MINIDK )
+#endif  // #if (defined HAL_KEY) && (HAL_KEY == TRUE)
+
 
 // Minimum connection interval (units of 1.25ms, 80=100ms) if automatic parameter update request is enabled
 #define DEFAULT_DESIRED_MIN_CONN_INTERVAL     80
@@ -209,7 +210,7 @@ static uint8 advertData[] =
 };
 
 // GAP GATT Attributes
-static uint8 attDeviceName[GAP_DEVICE_NAME_LEN] = "Flybird BLEPeripheral";
+static uint8 attDeviceName[GAP_DEVICE_NAME_LEN] = "Flybird Peripheral";
 
 /*********************************************************************
  * LOCAL FUNCTIONS
@@ -220,13 +221,13 @@ static void peripheralStateNotificationCB( gaprole_States_t newState );
 static void performPeriodicTask( void );
 static void simpleProfileChangeCB( uint8 paramID );
 
-#if defined( CC2540_MINIDK )
+#if (defined HAL_KEY) && (HAL_KEY == TRUE)
 static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys );
 #endif
 
 #if (defined HAL_LCD) && (HAL_LCD == TRUE)
 static char *bdAddr2Str ( uint8 *pAddr );
-#endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
+#endif
 
 
 
@@ -312,11 +313,11 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
   
   // Setup the GAP Peripheral Role Profile
   {
-    #if defined( CC2540_MINIDK )
-      // For the CC2540DK-MINI keyfob, device doesn't start advertising until button is pressed
+		#if (defined HAL_KEY) && (HAL_KEY == TRUE)
+      // device doesn't start advertising until button is pressed
       uint8 initial_advertising_enable = FALSE;
     #else
-      // For other hardware platforms, device starts advertising upon initialization
+      // device starts advertising upon initialization
       uint8 initial_advertising_enable = TRUE;
     #endif
 
@@ -396,7 +397,7 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
   }
 
 
-#if defined( CC2540_MINIDK )
+#if (defined HAL_KEY) && (HAL_KEY == TRUE)
 
   SK_AddService( GATT_ALL_SERVICES ); // Simple Keys Profile
 
@@ -410,6 +411,7 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
   // Note that there is still some leakage current from the buzzer,
   // accelerometer, LEDs, and buttons on the PCB.
 
+#if 0
   P0SEL = 0; // Configure Port 0 as GPIO
   P1SEL = 0; // Configure Port 1 as GPIO
   P2SEL = 0; // Configure Port 2 as GPIO
@@ -422,8 +424,8 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
   P0 = 0x03; // All pins on port 0 to low except for P0.0 and P0.1 (buttons)
   P1 = 0;   // All pins on port 1 to low
   P2 = 0;   // All pins on port 2 to low
-
-#endif // #if defined( CC2540_MINIDK )
+#endif
+#endif // #if (defined HAL_KEY) && (HAL_KEY == TRUE)
 
 #if (defined HAL_LCD) && (HAL_LCD == TRUE)
 
@@ -516,8 +518,24 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
     // Set timer for first periodic event
     osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_PERIODIC_EVT, SBP_PERIODIC_EVT_PERIOD );
 
+		#if (defined HAL_LED) && (HAL_LED == TRUE)
+		// Set LED1 on to give feedback that the power is on, and a timer to turn off
+		HalLedSet( HAL_LED_1, HAL_LED_MODE_ON );
+		osal_pwrmgr_device( PWRMGR_ALWAYS_ON ); // To keep the LED on continuously.
+		osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_POWERON_LED_TIMEOUT_EVT, 1000 );
+		#endif
+
     return ( events ^ SBP_START_DEVICE_EVT );
   }
+
+	#if (defined HAL_LED) && (HAL_LED == TRUE)
+	if ( events & SBP_POWERON_LED_TIMEOUT_EVT )
+	{
+		osal_pwrmgr_device( PWRMGR_BATTERY ); // Revert to battery mode after LED off
+		HalLedSet( HAL_LED_1, HAL_LED_MODE_OFF );
+		return ( events ^ SBP_POWERON_LED_TIMEOUT_EVT );
+	}
+	#endif
 
   if ( events & SBP_PERIODIC_EVT )
   {
@@ -550,25 +568,25 @@ static void simpleBLEPeripheral_ProcessOSALMsg( osal_event_hdr_t *pMsg )
 {
   switch ( pMsg->event )
   {     
-  #if defined( CC2540_MINIDK )
+		#if (defined HAL_KEY) && (HAL_KEY == TRUE)
     case KEY_CHANGE:
       simpleBLEPeripheral_HandleKeys( ((keyChange_t *)pMsg)->state, 
                                       ((keyChange_t *)pMsg)->keys );
       break;
-  #endif // #if defined( CC2540_MINIDK )
- 
+		#endif
+
     case GATT_MSG_EVENT:
       // Process GATT message
       simpleBLEPeripheral_ProcessGATTMsg( (gattMsgEvent_t *)pMsg );
       break;
-      
+
     default:
       // do nothing
       break;
   }
 }
 
-#if defined( CC2540_MINIDK )
+#if (defined HAL_KEY) && (HAL_KEY == TRUE)
 /*********************************************************************
  * @fn      simpleBLEPeripheral_HandleKeys
  *
@@ -587,9 +605,64 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
 
   VOID shift;  // Intentionally unreferenced parameter
 
-  if ( keys & HAL_KEY_SW_1 )
+  if ( keys & HAL_KEY_UP )
   {
-    SK_Keys |= SK_KEY_LEFT;
+
+		SK_Keys |= HAL_KEY_UP;
+
+		#if (defined HAL_LCD) && (HAL_UART == TRUE)
+		HalLcdWriteString( "JOY UP Press", HAL_LCD_LINE_3 );
+		#endif
+  }
+
+  if ( keys & HAL_KEY_RIGHT )
+  {
+
+		SK_Keys |= HAL_KEY_RIGHT;
+
+		#if (defined HAL_LCD) && (HAL_UART == TRUE)
+		HalLcdWriteString( "JOY RIGHT Press", HAL_LCD_LINE_3 );
+		#endif
+  }
+
+  if ( keys & HAL_KEY_CENTER )
+  {
+
+		SK_Keys |= HAL_KEY_CENTER;
+
+		#if (defined HAL_LCD) && (HAL_UART == TRUE)
+		HalLcdWriteString( "JOY CENTER Press", HAL_LCD_LINE_3 );
+		#endif
+  }
+
+  if ( keys & HAL_KEY_LEFT )
+  {
+
+		SK_Keys |= HAL_KEY_LEFT;
+
+	#if (defined HAL_LCD) && (HAL_UART == TRUE)
+			HalLcdWriteString( "JOY LEFT Press", HAL_LCD_LINE_3 );
+	#endif
+  }
+
+  if ( keys & HAL_KEY_DOWN )
+  {
+
+		SK_Keys |= HAL_KEY_DOWN;
+
+		#if (defined HAL_LCD) && (HAL_UART == TRUE)
+		HalLcdWriteString( "JOY DOWN Press", HAL_LCD_LINE_3 );
+		#endif
+  }
+
+  if ( keys & HAL_KEY_SW_7 )
+  {
+
+		SK_Keys |= HAL_KEY_SW_7;
+
+		#if (defined HAL_LCD) && (HAL_UART == TRUE)
+		HalLcdWriteString( "Button 2 Press", HAL_LCD_LINE_3 );
+		#endif
   }
 
   if ( keys & HAL_KEY_SW_2 )
@@ -630,8 +703,10 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
   // Set the value of the keys state to the Simple Keys Profile;
   // This will send out a notification of the keys state if enabled
   SK_SetParameter( SK_KEY_ATTR, sizeof ( uint8 ), &SK_Keys );
+
 }
-#endif // #if defined( CC2540_MINIDK )
+#endif // #if (defined HAL_KEY) && (HAL_KEY == TRUE)
+
 
 /*********************************************************************
  * @fn      simpleBLEPeripheral_ProcessGATTMsg
@@ -641,7 +716,102 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
  * @return  none
  */
 static void simpleBLEPeripheral_ProcessGATTMsg( gattMsgEvent_t *pMsg )
-{  
+{
+
+	HalLcdWriteString( (char *)pMsg->method,	HAL_LCD_LINE_3 );
+
+	//Measurement Indication Confirmation
+	switch (pMsg->method)
+	{
+		case ATT_ERROR_RSP :
+			HalLcdWriteString("Error Resp",  HAL_LCD_LINE_3 );
+			break;
+		case ATT_EXCHANGE_MTU_REQ :
+			HalLcdWriteString("Exch MTU Req",  HAL_LCD_LINE_3 );
+			break;
+		case ATT_EXCHANGE_MTU_RSP :
+			HalLcdWriteString("Exch MTU Resp",  HAL_LCD_LINE_3 );
+			break;
+		case ATT_FIND_INFO_REQ :
+			HalLcdWriteString("Find Info Req",	HAL_LCD_LINE_3 );
+			break;
+		case ATT_FIND_INFO_RSP :
+			HalLcdWriteString("Find Info Resp",	HAL_LCD_LINE_3 );
+			break;
+		case ATT_FIND_BY_TYPE_VALUE_REQ :
+			HalLcdWriteString("Find vaue Req", HAL_LCD_LINE_3 );
+			break;
+		case ATT_FIND_BY_TYPE_VALUE_RSP :
+			HalLcdWriteString("Find vaue Resp", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_BY_TYPE_REQ :
+			HalLcdWriteString("Read Type Req", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_BY_TYPE_RSP :
+			HalLcdWriteString("Read Type Resp", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_REQ :
+			HalLcdWriteString("Read Req", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_RSP :
+			HalLcdWriteString("Read Resp", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_BLOB_REQ :
+			HalLcdWriteString("Read Blob Req", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_BLOB_RSP :
+			HalLcdWriteString("Read Blob Resp", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_MULTI_REQ :
+			HalLcdWriteString("Read Multi Req", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_MULTI_RSP :
+			HalLcdWriteString("Read Multi Resp", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_BY_GRP_TYPE_REQ :
+			HalLcdWriteString("Read Type Req", HAL_LCD_LINE_3 );
+			break;
+		case ATT_READ_BY_GRP_TYPE_RSP :
+			HalLcdWriteString("Read Type Resp", HAL_LCD_LINE_3 );
+			break;
+		case ATT_WRITE_REQ :
+			HalLcdWriteString("Write Req", HAL_LCD_LINE_3 );
+			break;
+		case ATT_WRITE_RSP :
+			HalLcdWriteString("Write Resp", HAL_LCD_LINE_3 );
+			break;
+		case ATT_PREPARE_WRITE_REQ :
+			HalLcdWriteString("Prep Write Req", HAL_LCD_LINE_3 );
+			break;
+		case ATT_PREPARE_WRITE_RSP :
+			HalLcdWriteString("Prep Write Resp", HAL_LCD_LINE_3 );
+			break;
+		case ATT_EXECUTE_WRITE_REQ :
+			HalLcdWriteString("Exec Write Req", HAL_LCD_LINE_3 );
+			break;
+		case ATT_EXECUTE_WRITE_RSP :
+			HalLcdWriteString("Exec Write Resp", HAL_LCD_LINE_3 );
+			break;
+		case ATT_HANDLE_VALUE_NOTI :
+			HalLcdWriteString("Handle Noti", HAL_LCD_LINE_3 );
+			break;
+		case ATT_HANDLE_VALUE_IND :
+			HalLcdWriteString("Handle Ind", HAL_LCD_LINE_3 );
+			break;
+		case ATT_HANDLE_VALUE_CFM :
+			HalLcdWriteString("Handle Cfm", HAL_LCD_LINE_3 );
+			break;
+		case ATT_WRITE_CMD :
+			HalLcdWriteString("Write Command", HAL_LCD_LINE_3 );
+			break;
+		case ATT_SIGNED_WRITE_CMD :
+			HalLcdWriteString("Signed W Command", HAL_LCD_LINE_3 );
+			break;
+		default:
+			HalLcdWriteString("Unknown", HAL_LCD_LINE_3 );
+			break;
+	}
+
   GATT_bm_free( &pMsg->msg, pMsg->method );
 }
 
@@ -686,21 +856,29 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 
         DevInfo_SetParameter(DEVINFO_SYSTEM_ID, DEVINFO_SYSTEM_ID_LEN, systemId);
 
-        #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-          // Display device address
-          HalLcdWriteString( bdAddr2Str( ownAddress ),  HAL_LCD_LINE_2 );
-          HalLcdWriteString( "Initialized",  HAL_LCD_LINE_3 );
-        #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
+				#if (defined HAL_LCD) && (HAL_LCD == TRUE)
+				// Display device address
+				HalLcdWriteString( bdAddr2Str( ownAddress ),  HAL_LCD_LINE_2 );
+				HalLcdWriteString( "Initialized",  HAL_LCD_LINE_3 );
+        #endif
       }
       break;
 
     case GAPROLE_ADVERTISING:
       {
-        #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-          HalLcdWriteString( "Advertising",  HAL_LCD_LINE_3 );
-        #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
+				#if (defined HAL_LCD) && (HAL_LCD == TRUE)
+				uint8 ownAddress[B_ADDR_LEN];
+				GAPRole_GetParameter(GAPROLE_BD_ADDR, ownAddress);
+				// Display device address
+				HalLcdWriteString( bdAddr2Str( ownAddress ),  HAL_LCD_LINE_2 );
+				HalLcdWriteString( "Advertising",  HAL_LCD_LINE_3 );
+				#endif
+
+				#if (defined HAL_LED) && (HAL_LED == TRUE)
+				HalLedSet( HAL_LED_2, HAL_LED_MODE_ON );
+				#endif
       }
-      break;
+			break;
 
 #ifdef PLUS_BROADCASTER   
     /* After a connection is dropped a device in PLUS_BROADCASTER will continue
@@ -726,8 +904,12 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
       {        
         #if (defined HAL_LCD) && (HAL_LCD == TRUE)
           HalLcdWriteString( "Connected",  HAL_LCD_LINE_3 );
-        #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
-          
+        #endif
+
+				#if (defined HAL_LED) && (HAL_LED == TRUE)
+				HalLedSet( HAL_LED_2, HAL_LED_MODE_OFF );
+				#endif
+
 #ifdef PLUS_BROADCASTER
         // Only turn advertising on for this state when we first connect
         // otherwise, when we go from connected_advertising back to this state
@@ -757,14 +939,19 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
       {
         #if (defined HAL_LCD) && (HAL_LCD == TRUE)
           HalLcdWriteString( "Connected Advertising",  HAL_LCD_LINE_3 );
-        #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
+        #endif
       }
       break;      
     case GAPROLE_WAITING:
       {
         #if (defined HAL_LCD) && (HAL_LCD == TRUE)
           HalLcdWriteString( "Disconnected",  HAL_LCD_LINE_3 );
-        #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
+        #endif
+
+				#if (defined HAL_LED) && (HAL_LED == TRUE)
+					// Turn off LED that shows we're advertising
+					HalLedSet( HAL_LED_2, HAL_LED_MODE_OFF );
+				#endif
           
 #ifdef PLUS_BROADCASTER                
         uint8 advertEnabled = TRUE;
@@ -871,7 +1058,7 @@ static void simpleProfileChangeCB( uint8 paramID )
 
       #if (defined HAL_LCD) && (HAL_LCD == TRUE)
         HalLcdWriteStringValue( "Char 1:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
-      #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
+      #endif
 
       break;
 
@@ -880,7 +1067,7 @@ static void simpleProfileChangeCB( uint8 paramID )
 
       #if (defined HAL_LCD) && (HAL_LCD == TRUE)
         HalLcdWriteStringValue( "Char 3:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
-      #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
+      #endif
 
       break;
 
