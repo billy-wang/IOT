@@ -61,7 +61,13 @@
  * CONSTANTS
  */
 
-#define SERVAPP_NUM_ATTR_SUPPORTED        17
+#define SERVAPP_NUM_ATTR_SUPPORTED        21
+
+#define ATTRTBL_CHAR4_CCC_IDX							12
+#define ATTRTBL_CHAR6_CCC_IDX							19
+
+// Position of simple measurement value in attribute array.
+#define SIMPLE_CHAR6_MEAS_VALUE_POS         18
 
 /*********************************************************************
  * TYPEDEFS
@@ -104,6 +110,12 @@ CONST uint8 simpleProfilechar4UUID[ATT_BT_UUID_SIZE] =
 CONST uint8 simpleProfilechar5UUID[ATT_BT_UUID_SIZE] =
 { 
   LO_UINT16(SIMPLEPROFILE_CHAR5_UUID), HI_UINT16(SIMPLEPROFILE_CHAR5_UUID)
+};
+
+// Characteristic 6 UUID: 0xFFF6
+CONST uint8 simpleProfilechar6UUID[ATT_BT_UUID_SIZE] =
+{ 
+  LO_UINT16(SIMPLEPROFILE_CHAR6_UUID), HI_UINT16(SIMPLEPROFILE_CHAR6_UUID)
 };
 
 /*********************************************************************
@@ -182,6 +194,21 @@ static uint8 simpleProfileChar5[SIMPLEPROFILE_CHAR5_LEN] = { 0, 0, 0, 0, 0 };
 
 // Simple Profile Characteristic 5 User Description
 static uint8 simpleProfileChar5UserDesp[17] = "Characteristic 5";
+
+// Simple Profile Characteristic 6 Properties
+static uint8 simpleProfileChar6Props = GATT_PROP_INDICATE;
+
+// Characteristic 6 Value
+static uint8 simpleProfileChar6[SIMPLEPROFILE_CHAR6_LEN] = { 0 };
+
+// Simple Profile Characteristic 6 Configuration Each client has its own
+// instantiation of the Client Characteristic Configuration. Reads of the
+// Client Characteristic Configuration only shows the configuration for
+// that client and writes only affect the configuration of that client.
+static gattCharCfg_t *simpleProfileChar6Config[GATT_MAX_ATTR_SIZE];
+                                        
+// Simple Profile Characteristic 6 User Description
+static uint8 simpleProfileChar6UserDesp[17] = "Characteristic 6";
 
 /*********************************************************************
  * Profile Attributes - Table
@@ -324,6 +351,38 @@ static gattAttribute_t simpleProfileAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
         0, 
         simpleProfileChar5UserDesp 
       },
+      
+		// Characteristic 6 Declaration
+		{ 
+			{ ATT_BT_UUID_SIZE, characterUUID },
+				GATT_PERMIT_READ, 
+				0,
+				&simpleProfileChar6Props 
+			},
+				
+		// Characteristic Value 6
+		{ 
+			{ ATT_BT_UUID_SIZE, simpleProfilechar6UUID },
+				0, 
+				0, 
+				simpleProfileChar6 
+		},
+				
+		// Characteristic 6 configuration
+		{ 
+			{ ATT_BT_UUID_SIZE, clientCharCfgUUID },
+				GATT_PERMIT_READ | GATT_PERMIT_WRITE, 
+				0, 
+				(uint8 *)simpleProfileChar6Config 
+			},
+					
+		// Characteristic 6 User Description
+		{ 
+			{ ATT_BT_UUID_SIZE, charUserDescUUID },
+				GATT_PERMIT_READ, 
+				0, 
+				simpleProfileChar6UserDesp 
+		},
 };
 
 /*********************************************************************
@@ -376,7 +435,18 @@ bStatus_t SimpleProfile_AddService( uint32 services )
   
   // Initialize Client Characteristic Configuration attributes
   GATTServApp_InitCharCfg( INVALID_CONNHANDLE, simpleProfileChar4Config );
-  
+	
+  // Allocate Client Characteristic Configuration table
+  *simpleProfileChar6Config = (gattCharCfg_t *)osal_mem_alloc( sizeof(gattCharCfg_t) *
+                                                              linkDBNumConns );
+  if ( *simpleProfileChar6Config == NULL )
+  {     
+    return ( bleMemAllocError );
+  }
+
+  // Initialize Client Characteristic Configuration attributes
+  GATTServApp_InitCharCfg( INVALID_CONNHANDLE, *simpleProfileChar6Config ); 
+	
   if ( services & SIMPLEPROFILE_SERVICE )
   {
     // Register GATT attribute list and CBs with GATT Server App
@@ -495,7 +565,18 @@ bStatus_t SimpleProfile_SetParameter( uint8 param, uint8 len, void *value )
         ret = bleInvalidRange;
       }
       break;
-      
+
+		case SIMPLEPROFILE_CHAR6:
+      if ( len == SIMPLEPROFILE_CHAR6_LEN ) 
+      {
+        VOID memcpy( simpleProfileChar6, value, SIMPLEPROFILE_CHAR6_LEN );
+      }
+      else
+      {
+        ret = bleInvalidRange;
+      }
+      break;
+
     default:
       ret = INVALIDPARAMETER;
       break;
@@ -541,7 +622,11 @@ bStatus_t SimpleProfile_GetParameter( uint8 param, void *value )
     case SIMPLEPROFILE_CHAR5:
       VOID memcpy( value, simpleProfileChar5, SIMPLEPROFILE_CHAR5_LEN );
       break;      
-      
+
+		case SIMPLEPROFILE_CHAR6:
+      VOID memcpy( value, simpleProfileChar6, SIMPLEPROFILE_CHAR6_LEN );
+      break;
+
     default:
       ret = INVALIDPARAMETER;
       break;
@@ -609,7 +694,12 @@ static bStatus_t simpleProfile_ReadAttrCB( uint16 connHandle, gattAttribute_t *p
         *pLen = SIMPLEPROFILE_CHAR5_LEN;
         VOID memcpy( pValue, pAttr->pValue, SIMPLEPROFILE_CHAR5_LEN );
         break;
-        
+
+			case SIMPLEPROFILE_CHAR6_UUID:
+        *pLen = SIMPLEPROFILE_CHAR6_LEN;
+        VOID memcpy( pValue, pAttr->pValue, SIMPLEPROFILE_CHAR6_LEN );
+        break;
+
       default:
         // Should never get here! (characteristics 3 and 4 do not have read permissions)
         *pLen = 0;
@@ -697,8 +787,23 @@ static bStatus_t simpleProfile_WriteAttrCB( uint16 connHandle, gattAttribute_t *
         break;
 
       case GATT_CLIENT_CHAR_CFG_UUID:
-        status = GATTServApp_ProcessCCCWriteReq( connHandle, pAttr, pValue, len,
-                                                 offset, GATT_CLIENT_CFG_NOTIFY );
+				if ( pAttr->handle == simpleProfileAttrTbl[ATTRTBL_CHAR4_CCC_IDX].handle )//CHAR4 NOTIFY
+				{
+    			// BloodPressure Notifications 
+					status = GATTServApp_ProcessCCCWriteReq( connHandle, pAttr, pValue, len,
+																									offset, GATT_CLIENT_CFG_NOTIFY );
+				}
+				else if ( pAttr->handle == simpleProfileAttrTbl[ATTRTBL_CHAR6_CCC_IDX].handle )//CHAR6 INDICATE
+				{  
+    			// BloodPressure Indications 
+					status = GATTServApp_ProcessCCCWriteReq( connHandle, pAttr, pValue, len,
+																									offset, GATT_CLIENT_CFG_INDICATE );
+				}
+				else
+				{
+					status = ATT_ERR_INVALID_HANDLE;
+				}
+
         break;
         
       default:
@@ -721,6 +826,56 @@ static bStatus_t simpleProfile_WriteAttrCB( uint16 connHandle, gattAttribute_t *
   
   return ( status );
 }
+
+/*********************************************************************
+ * @fn      SimpleProfile_Char6_Indicate
+ *
+ * @brief       Send a indication containing a bloodPressure
+ *              measurement.
+ *
+ * @param       connHandle - connection handle
+ * @param       pNoti - pointer to notification structure
+ *
+ * @return      Success or Failure
+ *
+ */
+#if 0
+bStatus_t SimpleProfile_Char6_Indicate( uint16 connHandle, attHandleValueInd_t *pInd, uint8 taskId)
+{
+		
+		value  = GATTServApp_ReadCharCfg( connHandle, simpleProfileChar6Config );
+	
+		if ( value & GATT_CLIENT_CFG_INDICATE )
+		{		
+    	pInd->handle = simpleProfileAttrTbl[SIMPLE_CHAR6_MEAS_VALUE_POS].handle;
+			// Send the Indication.
+			//return GATT_Indication(connHandle, pInd, FALSE, taskId);
+		}  
+			
+		return(FAILURE);	
+	}  
+#else
+bStatus_t SimpleProfile_Char6_Indicate( uint16 connHandle, uint8 *pValue, uint8 len, uint8 taskId)  
+{  
+  attHandleValueInd_t  indi;
+  uint16 value;
+  
+  value  = GATTServApp_ReadCharCfg( connHandle, *simpleProfileChar6Config );
+
+  if ( value & GATT_CLIENT_CFG_INDICATE )
+  {
+    indi.handle = simpleProfileAttrTbl[SIMPLE_CHAR6_MEAS_VALUE_POS].handle;
+    indi.len = len;
+    osal_memcpy( indi.pValue, pValue, len);
+		
+    // Send the Indication.
+    return GATT_Indication(connHandle, &indi, FALSE, taskId);
+		
+  }
+	
+  return(FAILURE);  
+}  
+#endif
 
 /*********************************************************************
 *********************************************************************/

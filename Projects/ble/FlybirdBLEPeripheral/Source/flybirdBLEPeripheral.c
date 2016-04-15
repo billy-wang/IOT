@@ -172,8 +172,6 @@ static uint8 scanRspData[] =
 	0x6f, 	// 'o'
 	0x72, 	// 'r'
 	0x79, 	// 'y'
-	0x05, 	// length of this data	
-
 
   // connection interval range
   0x05,   // length of this data
@@ -389,11 +387,14 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
     uint8 charValue3 = 3;
     uint8 charValue4 = 4;
     uint8 charValue5[SIMPLEPROFILE_CHAR5_LEN] = { 1, 2, 3, 4, 5 };
+    uint8 charValue6[SIMPLEPROFILE_CHAR6_LEN] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 
+																									11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
     SimpleProfile_SetParameter( SIMPLEPROFILE_CHAR1, sizeof ( uint8 ), &charValue1 );
     SimpleProfile_SetParameter( SIMPLEPROFILE_CHAR2, sizeof ( uint8 ), &charValue2 );
     SimpleProfile_SetParameter( SIMPLEPROFILE_CHAR3, sizeof ( uint8 ), &charValue3 );
     SimpleProfile_SetParameter( SIMPLEPROFILE_CHAR4, sizeof ( uint8 ), &charValue4 );
     SimpleProfile_SetParameter( SIMPLEPROFILE_CHAR5, SIMPLEPROFILE_CHAR5_LEN, charValue5 );
+    SimpleProfile_SetParameter( SIMPLEPROFILE_CHAR6, SIMPLEPROFILE_CHAR6_LEN, charValue6 );
   }
 
 
@@ -643,6 +644,31 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
 	#if (defined HAL_LCD) && (HAL_UART == TRUE)
 			HalLcdWriteString( "JOY LEFT Press", HAL_LCD_LINE_3 );
 	#endif
+
+		uint16 notify_Handle;
+		//uint8 buf[20]={0};
+		uint8 *p;   
+		uint8 status;  
+    
+		GAPRole_GetParameter( GAPROLE_CONNHANDLE, &notify_Handle);
+    
+		for(uint8 i = 0; i < 20; i++)
+		{
+			*(p+i) = i;  
+		}
+  
+		status = SimpleProfile_Char6_Indicate(notify_Handle, p, 20, simpleBLEPeripheral_TaskID);    
+    
+		#if (defined HAL_UART) && (HAL_UART == TRUE)
+		if(status == SUCCESS)  
+		{  
+			NPI_PrintString("indicate is seccess to send!\r\n");  
+		}  
+		else  
+		{  
+			NPI_PrintString("indicate is fail to send!\r\n");      
+		}
+		#endif
   }
 
   if ( keys & HAL_KEY_DOWN )
