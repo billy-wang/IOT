@@ -76,6 +76,11 @@
   #include "oad_target.h"
 #endif
 
+#include "linkdb.h"
+#include "bpservice.h"
+#include "timeapp.h"
+#include "OSAL_Clock.h"
+
 /*********************************************************************
  * MACROS
  */
@@ -85,7 +90,7 @@
  */
 
 // How often to perform periodic event
-#define SBP_PERIODIC_EVT_PERIOD                   5000
+#define SBP_PERIODIC_EVT_PERIOD                   9000
 
 // What is the advertising interval when device is discoverable (units of 625us, 160=100ms)
 #define DEFAULT_ADVERTISING_INTERVAL          160
@@ -112,6 +117,9 @@
 // Supervision timeout value (units of 10ms, 1000=10s) if automatic parameter update request is enabled
 #define DEFAULT_DESIRED_CONN_TIMEOUT          1000
 
+// Some values used to simulate measurements
+#define FLAGS_IDX_MAX                         7      //3 flags c/f -- timestamp -- site
+
 // Whether to enable automatic parameter update request when a connection is formed
 #define DEFAULT_ENABLE_UPDATE_REQUEST         TRUE
 
@@ -126,6 +134,18 @@
 // Length of bd addr as a string
 #define B_ADDR_STR_LEN                        15
 
+#define BP_DISCONNECT_PERIOD                  6000
+
+#define CUFF_MAX                              40
+
+#define TIMER_CUFF_PERIOD                     500
+
+// Max measurement storage count
+#define BP_STORE_MAX                         	4
+
+#define BP_CUFF_MEAS_LEN                      12
+#define BP_MEAS_LEN                           19
+
 /*********************************************************************
  * TYPEDEFS
  */
@@ -133,6 +153,11 @@
 /*********************************************************************
  * GLOBAL VARIABLES
  */
+// Task ID for internal task/event processing
+uint8 simpleBLEPeripheral_TaskID;
+
+// Time stamp read from server
+uint8 timeConfigDone;
 
 /*********************************************************************
  * EXTERNAL VARIABLES
@@ -145,9 +170,22 @@
 /*********************************************************************
  * LOCAL VARIABLES
  */
-static uint8 simpleBLEPeripheral_TaskID;   // Task ID for internal task/event processing
-
 static gaprole_States_t gapProfileState = GAPROLE_INIT;
+
+// Service discovery state
+static uint8 timeAppDiscState = DISC_IDLE;
+
+// Service discovery complete
+static uint8 timeAppDiscoveryCmpl = FALSE;
+
+// Characteristic configuration state
+static uint8 timeAppConfigState = TIMEAPP_CONFIG_START;
+
+// TRUE if pairing started
+static uint8 timeAppPairingStarted = FALSE;
+
+// TRUE if discovery postponed due to pairing
+static uint8 timeAppDiscPostponed = FALSE;
 
 // GAP - SCAN RSP data (max size = 31 bytes)
 static uint8 scanRspData[] =
@@ -210,6 +248,54 @@ static uint8 advertData[] =
 // GAP GATT Attributes
 static uint8 attDeviceName[GAP_DEVICE_NAME_LEN] = "Flybird Peripheral";
 
+// Bonded state
+static bool timeAppBonded = FALSE;
+
+// Bonded peer address
+static uint8 timeAppBondedAddr[B_ADDR_LEN];
+
+// Last connection address
+static uint8 lastConnAddr[B_ADDR_LEN] = {0xf,0xf,0xf,0xf,0xf,0xe};;
+
+static bool connectedToLastAddress = false;
+
+// GAP connection handle
+uint16 gapConnHandle;
+
+static uint16 bpSystolic = 120; //mmg
+static uint16 bpDiastolic = 80; //mmg
+static uint16 bpMAP = 90; //70-110mmg
+static uint16 bpPulseRate = 60; //pulseRate
+static uint8  bpUserId = 1;
+static uint16 bpMeasStatus = 0;
+
+// flags for simulated measurements
+static const uint8 bloodPressureFlags[FLAGS_IDX_MAX] =
+{
+  BLOODPRESSURE_FLAGS_MMHG | BLOODPRESSURE_FLAGS_TIMESTAMP |
+    BLOODPRESSURE_FLAGS_PULSE | BLOODPRESSURE_FLAGS_USER |
+    BLOODPRESSURE_FLAGS_STATUS,
+  BLOODPRESSURE_FLAGS_MMHG | BLOODPRESSURE_FLAGS_TIMESTAMP,
+  BLOODPRESSURE_FLAGS_MMHG,
+  BLOODPRESSURE_FLAGS_KPA,
+  BLOODPRESSURE_FLAGS_KPA | BLOODPRESSURE_FLAGS_TIMESTAMP,
+  BLOODPRESSURE_FLAGS_KPA | BLOODPRESSURE_FLAGS_TIMESTAMP |
+    BLOODPRESSURE_FLAGS_PULSE,
+  0x00
+};
+
+// initial value of flags
+static uint8 bloodPressureFlagsIdx = 0;
+
+// cuff count, when we reach max, send final BP meas
+static uint8 cuffCount = 0;
+
+static attHandleValueInd_t bpStoreMeas[BP_STORE_MAX];
+static uint8 bpStoreStartIndex = 0;
+static uint8 bpStoreIndex = 0;
+
+static uint8 lastChar3Value = 0;
+
 /*********************************************************************
  * LOCAL FUNCTIONS
  */
@@ -218,6 +304,17 @@ static void simpleBLEPeripheral_ProcessGATTMsg( gattMsgEvent_t *pMsg );
 static void peripheralStateNotificationCB( gaprole_States_t newState );
 static void performPeriodicTask( void );
 static void simpleProfileChangeCB( uint8 paramID );
+static void simpleProfileSendIndicate(void);
+
+static void bpServiceCB(uint8 event);
+static void timeAppPasscodeCB( uint8 *deviceAddr, uint16 connectionHandle,
+																						uint8 uiInputs, uint8 uiOutputs );
+static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status );
+static void bpFinalMeas(void);
+static void bpStoreIndications(attHandleValueInd_t* pInd);
+static void bpSendStoredMeas();
+static void cuffMeas(void);
+static void simulateMeas( void );
 
 #if (defined HAL_KEY) && (HAL_KEY == TRUE)
 static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys );
@@ -241,10 +338,10 @@ static gapRolesCBs_t simpleBLEPeripheral_PeripheralCBs =
 };
 
 // GAP Bond Manager Callbacks
-static gapBondCBs_t simpleBLEPeripheral_BondMgrCBs =
+static gapBondCBs_t timeApp_BondMgrCBs =
 {
-  NULL,                     // Passcode callback (not used by application)
-  NULL                      // Pairing / Bonding state Callback (not used by application)
+  timeAppPasscodeCB,                     // Passcode callback (not used by application)
+  timeAppPairStateCB                      // Pairing / Bonding state Callback (not used by application)
 };
 
 // Simple GATT Profile Callbacks
@@ -256,7 +353,7 @@ static simpleProfileCBs_t simpleBLEPeripheral_SimpleProfileCBs =
  * PUBLIC FUNCTIONS
  */
  
-#if (defined HAL_LCD) && (HAL_UART == TRUE)
+#if (defined HAL_UART) && (HAL_UART == TRUE)
 // Npi Serial Callbacks
 static void NpiSerialPeripheralCB( uint8 port, uint8 events )
 {
@@ -371,11 +468,27 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
     GAPBondMgr_SetParameter( GAPBOND_BONDING_ENABLED, sizeof ( uint8 ), &bonding );
   }
 
+  // Stop config reads when done
+  timeConfigDone = FALSE;
+
+  // Initialize GATT Client
+  VOID GATT_InitClient();
+
+  // Register to receive incoming ATT Indications/Notifications
+  GATT_RegisterForInd( simpleBLEPeripheral_TaskID );
+
+  // Register for BloodPressure service callback
+  BloodPressure_Register( bpServiceCB );
+
+  // Initialize measurement storage table
+  VOID osal_memset( bpStoreMeas, 0, (sizeof(attHandleValueInd_t) * BP_STORE_MAX) );
+
   // Initialize GATT attributes
   GGS_AddService( GATT_ALL_SERVICES );            // GAP
   GATTServApp_AddService( GATT_ALL_SERVICES );    // GATT attributes
   DevInfo_AddService();                           // Device Information Service
   SimpleProfile_AddService( GATT_ALL_SERVICES );  // Simple GATT Profile
+  BloodPressure_AddService( GATT_ALL_SERVICES );
 #if defined FEATURE_OAD
   VOID OADTarget_AddService();                    // OAD Profile
 #endif
@@ -460,7 +573,7 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
   // Setup a delayed profile startup
   osal_set_event( simpleBLEPeripheral_TaskID, SBP_START_DEVICE_EVT );
 
-#if (defined HAL_LCD) && (HAL_UART == TRUE)
+#if (defined HAL_UART) && (HAL_UART == TRUE)
 	// Initialize uart
 	NPI_InitTransport(NpiSerialPeripheralCB);
 	NPI_WriteTransport("FlybirdBLECentral_Init\r\n", 23);
@@ -492,6 +605,9 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
 
   VOID task_id; // OSAL required parameter that isn't used in this function
 
+  ////////////////////////////////////////////////////////////////////
+  // 		 	EVENT    			 MSG 				DONE
+  ////////////////////////////////////////////////////////////////////
   if ( events & SYS_EVENT_MSG )
   {
     uint8 *pMsg;
@@ -508,13 +624,16 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
     return (events ^ SYS_EVENT_MSG);
   }
 
+  ////////////////////////////////////////////////////////////////////
+  // 			START    		DEVICE    	 EVENT     	DONE
+  ////////////////////////////////////////////////////////////////////
   if ( events & SBP_START_DEVICE_EVT )
   {
     // Start the Device
     VOID GAPRole_StartDevice( &simpleBLEPeripheral_PeripheralCBs );
 
     // Start Bond Manager
-    VOID GAPBondMgr_Register( &simpleBLEPeripheral_BondMgrCBs );
+    VOID GAPBondMgr_Register( &timeApp_BondMgrCBs );
 
     // Set timer for first periodic event
     osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_PERIODIC_EVT, SBP_PERIODIC_EVT_PERIOD );
@@ -529,6 +648,9 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
     return ( events ^ SBP_START_DEVICE_EVT );
   }
 
+  ////////////////////////////////////////////////////////////////////
+  // 				POWERON		LED 		TIMEOUT 	EVENT		 DONE
+  ////////////////////////////////////////////////////////////////////
 	#if (defined HAL_LED) && (HAL_LED == TRUE)
 	if ( events & SBP_POWERON_LED_TIMEOUT_EVT )
 	{
@@ -538,6 +660,9 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
 	}
 	#endif
 
+  ////////////////////////////////////////////////////////////////////
+  // 				PERIODIC 					EVENT 						DONE
+  ////////////////////////////////////////////////////////////////////
   if ( events & SBP_PERIODIC_EVT )
   {
     // Restart timer
@@ -550,6 +675,99 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
     performPeriodicTask();
 
     return (events ^ SBP_PERIODIC_EVT);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // 			START				DISCOVERY 			EVENT 				DONE
+  ////////////////////////////////////////////////////////////////////
+  if ( events & SBP_START_DISCOVERY_EVT )
+  {
+    if ( timeAppPairingStarted )
+    {
+      // Postpone discovery until pairing completes
+      timeAppDiscPostponed = TRUE;
+    }
+    else
+    {
+      timeAppDiscState = timeAppDiscStart();
+    }
+    return ( events ^ SBP_START_DISCOVERY_EVT );
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // 				BloodPressure 		MEAS 		EVENT		DONE
+  ////////////////////////////////////////////////////////////////////
+  if ( events & SBP_TIMER_BPMEAS_EVT )
+  {
+    // Perform final measurement
+    bpFinalMeas();
+
+    return (events ^ SBP_TIMER_BPMEAS_EVT);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // 				TIMER			CUFF 			EVENT
+  ////////////////////////////////////////////////////////////////////
+  if ( events & SBP_TIMER_CUFF_EVT )
+  {
+    // Perform a Cutoff Measurement
+    cuffMeas();
+
+    cuffCount++;
+
+    // If cuff count not met, keep sending cuff measurements
+    if(cuffCount < CUFF_MAX)
+    {
+      // Start interval timer to send BP, just for simulation
+      osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
+
+    }
+    // Get ready to send final measurement
+    else
+    {
+      // Start timer to send final BP meas
+      osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_BPMEAS_EVT, TIMER_CUFF_PERIOD );
+    }
+
+    return (events ^ SBP_TIMER_CUFF_EVT);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  //			 Enable 			BloodPressure 			CCC
+  ////////////////////////////////////////////////////////////////////
+  if ( events & SBP_CCC_UPDATE_EVT )
+  {
+    if (gapProfileState == GAPROLE_CONNECTED)
+    {
+      //if previously connected and measurements are active send stored
+      if( connectedToLastAddress == true)
+      {
+        //send stored measurements
+        bpSendStoredMeas();
+      }
+    }
+
+    return (events ^ SBP_CCC_UPDATE_EVT);
+  }
+
+	////////////////////////////////////////////////////////////////////
+  // 	Disconnect 		after 		sending 		measurement
+	////////////////////////////////////////////////////////////////////
+  if ( events & SBP_DISCONNECT_EVT )
+  {
+    uint8 advEnable = FALSE;
+
+    //disable advertising on disconnect
+    GAPRole_SetParameter( GAPROLE_ADVERT_ENABLED, sizeof( uint8 ), &advEnable );
+
+		#if (defined HAL_LED) && (HAL_LED == TRUE)
+    HalLedSet ( HAL_LED_1, HAL_LED_MODE_ON );
+		#endif
+
+    // Terminate Connection
+    GAPRole_TerminateConnection();
+
+    return (events ^ SBP_DISCONNECT_EVT);
   }
 
   // Discard unknown events
@@ -645,30 +863,7 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
 			HalLcdWriteString( "JOY LEFT Press", HAL_LCD_LINE_3 );
 	#endif
 
-		uint16 notify_Handle;
-		//uint8 buf[20]={0};
-		uint8 *p;   
-		uint8 status;  
-    
-		GAPRole_GetParameter( GAPROLE_CONNHANDLE, &notify_Handle);
-    
-		for(uint8 i = 0; i < 20; i++)
-		{
-			*(p+i) = i;  
-		}
-  
-		status = SimpleProfile_Char6_Indicate(notify_Handle, p, 20, simpleBLEPeripheral_TaskID);    
-    
-		#if (defined HAL_UART) && (HAL_UART == TRUE)
-		if(status == SUCCESS)  
-		{  
-			NPI_PrintString("indicate is seccess to send!\r\n");  
-		}  
-		else  
-		{  
-			NPI_PrintString("indicate is fail to send!\r\n");      
-		}
-		#endif
+		simpleProfileSendIndicate();
   }
 
   if ( keys & HAL_KEY_DOWN )
@@ -721,7 +916,18 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
 
       //change the GAP advertisement status to opposite of current status
       GAPRole_SetParameter( GAPROLE_ADVERT_ENABLED, sizeof( uint8 ), &new_adv_enabled_status );
+
+			//start simulation timer (start --> cuff -->measurement ready)
+      osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
+
+      //reset cuff count
+      cuffCount = 0;
+
 #ifndef PLUS_BROADCASTER
+    }
+		else //connected mode, simulate some measurements
+    {
+      simulateMeas();
     }
 #endif // PLUS_BROADCASTER
   }
@@ -743,7 +949,7 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
  */
 static void simpleBLEPeripheral_ProcessGATTMsg( gattMsgEvent_t *pMsg )
 {
-
+	#if (defined HAL_LCD) && (HAL_LCD == TRUE)
 	HalLcdWriteString( (char *)pMsg->method,	HAL_LCD_LINE_3 );
 
 	//Measurement Indication Confirmation
@@ -837,8 +1043,69 @@ static void simpleBLEPeripheral_ProcessGATTMsg( gattMsgEvent_t *pMsg )
 			HalLcdWriteString("Unknown", HAL_LCD_LINE_3 );
 			break;
 	}
+	#endif
+
+  // Measurement Indication Confirmation
+  if( pMsg->method == ATT_HANDLE_VALUE_CFM)
+  {
+      bpSendStoredMeas();
+  }
+
+  if ( pMsg->method == ATT_HANDLE_VALUE_NOTI ||
+       pMsg->method == ATT_HANDLE_VALUE_IND )
+  {
+    timeAppIndGattMsg( pMsg );
+  }
+  else if ( pMsg->method == ATT_READ_RSP ||
+            pMsg->method == ATT_WRITE_RSP )
+  {
+    timeAppConfigState = timeAppConfigGattMsg ( timeAppConfigState, pMsg );
+    if ( timeAppConfigState == TIMEAPP_CONFIG_CMPL )
+    {
+      timeAppDiscoveryCmpl = TRUE;
+    }
+  }
+  else
+  {
+    timeAppDiscState = timeAppDiscGattMsg( timeAppDiscState, pMsg );
+    if ( timeAppDiscState == DISC_IDLE )
+    {
+      // Start characteristic configuration
+      timeAppConfigState = timeAppConfigNext( TIMEAPP_CONFIG_START );
+    }
+  }
 
   GATT_bm_free( &pMsg->msg, pMsg->method );
+}
+
+/*********************************************************************
+ * @fn      timeAppDisconnected
+ *
+ * @brief   Handle disconnect.
+ *
+ * @return  none
+ */
+static void timeAppDisconnected( void )
+{
+  // Initialize state variables
+  timeAppDiscState = DISC_IDLE;
+  timeAppPairingStarted = FALSE;
+  timeAppDiscPostponed = FALSE;
+
+  // stop periodic measurement
+  osal_stop_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT );
+
+  // reset bloodPressure measurement client configuration
+  uint16 param = 0;
+  BloodPressure_SetParameter(BLOODPRESSURE_MEAS_CHAR_CFG, sizeof(uint16), (uint8 *) &param);
+
+  // reset bloodPressure intermediate measurement client configuration
+  BloodPressure_SetParameter(BLOODPRESSURE_IMEAS_CHAR_CFG, sizeof(uint16), (uint8 *) &param);
+
+  uint8 advEnable = FALSE;
+
+  //disable advertising on disconnect
+  GAPRole_SetParameter( GAPROLE_ADVERT_ENABLED, sizeof( uint8 ), &advEnable );
 }
 
 /*********************************************************************
@@ -887,6 +1154,10 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 				HalLcdWriteString( bdAddr2Str( ownAddress ),  HAL_LCD_LINE_2 );
 				HalLcdWriteString( "Initialized",  HAL_LCD_LINE_3 );
         #endif
+
+				#if (defined HAL_UART) && (HAL_UART == TRUE)
+				NPI_PrintString("Initialized\r\n");
+				#endif
       }
       break;
 
@@ -902,6 +1173,10 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 
 				#if (defined HAL_LED) && (HAL_LED == TRUE)
 				HalLedSet( HAL_LED_2, HAL_LED_MODE_ON );
+				#endif
+
+				#if (defined HAL_UART) && (HAL_UART == TRUE)
+				NPI_PrintString("Advertising\r\n");
 				#endif
       }
 			break;
@@ -932,9 +1207,51 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
           HalLcdWriteString( "Connected",  HAL_LCD_LINE_3 );
         #endif
 
+				#if (defined HAL_UART) && (HAL_UART == TRUE)
+				NPI_PrintString("Connected\r\n");
+				#endif
+
 				#if (defined HAL_LED) && (HAL_LED == TRUE)
 				HalLedSet( HAL_LED_2, HAL_LED_MODE_OFF );
 				#endif
+
+				linkDBItem_t	*pItem;
+
+				// Get connection handle
+				GAPRole_GetParameter( GAPROLE_CONNHANDLE, &gapConnHandle );
+
+				// Get peer bd address
+				if ( (pItem = linkDB_Find( gapConnHandle )) != NULL)
+				{
+					// If connected to device without bond do service discovery
+					if ( !osal_memcmp( pItem->addr, timeAppBondedAddr, B_ADDR_LEN ) )
+					{
+						timeAppDiscoveryCmpl = FALSE;
+					}
+					else
+					{
+						timeAppDiscoveryCmpl = TRUE;
+					}
+
+					// if this was last connection address don't do discovery
+					if(osal_memcmp( pItem->addr, lastConnAddr, B_ADDR_LEN ))
+					{
+						timeAppDiscoveryCmpl = TRUE;
+						connectedToLastAddress = true;
+					}
+					else
+					{
+						//save the last connected address
+						osal_memcpy(lastConnAddr, pItem->addr, B_ADDR_LEN );
+					}
+
+					// Initiate service discovery if necessary
+					if ( timeAppDiscoveryCmpl == FALSE )
+					{
+					 // osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_START_DISCOVERY_EVT, DEFAULT_DISCOVERY_DELAY );
+					}
+
+				}
 
 #ifdef PLUS_BROADCASTER
         // Only turn advertising on for this state when we first connect
@@ -966,13 +1283,22 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
         #if (defined HAL_LCD) && (HAL_LCD == TRUE)
           HalLcdWriteString( "Connected Advertising",  HAL_LCD_LINE_3 );
         #endif
+
+				#if (defined HAL_UART) && (HAL_UART == TRUE)
+				NPI_PrintString("Connected Advertising\r\n");
+				#endif
       }
-      break;      
+      break;
+
     case GAPROLE_WAITING:
       {
         #if (defined HAL_LCD) && (HAL_LCD == TRUE)
           HalLcdWriteString( "Disconnected",  HAL_LCD_LINE_3 );
         #endif
+
+				#if (defined HAL_UART) && (HAL_UART == TRUE)
+				NPI_PrintString("Disconnected\r\n");
+				#endif
 
 				#if (defined HAL_LED) && (HAL_LED == TRUE)
 					// Turn off LED that shows we're advertising
@@ -985,7 +1311,7 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
         // Enabled connectable advertising.
         GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8),
                              &advertEnabled);
-#endif //PLUS_BROADCASTER
+#endif
       }
       break;
 
@@ -993,12 +1319,16 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
       {
         #if (defined HAL_LCD) && (HAL_LCD == TRUE)
           HalLcdWriteString( "Timed Out",  HAL_LCD_LINE_3 );
-        #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
-          
+        #endif 
+
+				#if (defined HAL_UART) && (HAL_UART == TRUE)
+				NPI_PrintString("Timed Out\r\n");
+				#endif
+
 #ifdef PLUS_BROADCASTER
         // Reset flag for next connection.
         first_conn_flag = 0;
-#endif //#ifdef (PLUS_BROADCASTER)
+#endif 
       }
       break;
 
@@ -1006,7 +1336,11 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
       {
         #if (defined HAL_LCD) && (HAL_LCD == TRUE)
           HalLcdWriteString( "Error",  HAL_LCD_LINE_3 );
-        #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
+        #endif
+
+				#if (defined HAL_UART) && (HAL_UART == TRUE)
+				NPI_PrintString("Error\r\n");
+				#endif
       }
       break;
 
@@ -1014,11 +1348,29 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
       {
         #if (defined HAL_LCD) && (HAL_LCD == TRUE)
           HalLcdWriteString( "",  HAL_LCD_LINE_3 );
-        #endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
+        #endif
+
+				#if (defined HAL_UART) && (HAL_UART == TRUE)
+				NPI_PrintString("unknow state!!\r\n");
+				#endif
       }
       break;
 
   }
+
+		// if disconnected
+	 if ( gapProfileState == GAPROLE_CONNECTED &&
+						 newState != GAPROLE_CONNECTED )
+	 {
+		 timeAppDisconnected();
+
+		 //always stop intermediate timer
+		 osal_stop_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT );
+
+		 // stop disconnect timer
+		 osal_stop_timerEx( simpleBLEPeripheral_TaskID, BP_DISCONNECT_PERIOD );
+
+	 }
 
   gapProfileState = newState;
 
@@ -1052,7 +1404,7 @@ static void performPeriodicTask( void )
   // Call to retrieve the value of the third characteristic in the profile
   stat = SimpleProfile_GetParameter( SIMPLEPROFILE_CHAR3, &valueToCopy);
 
-  if( stat == SUCCESS )
+  if( (stat == SUCCESS) && (lastChar3Value != valueToCopy))
   {
     /*
      * Call to set that value of the fourth characteristic in the profile. Note
@@ -1061,6 +1413,7 @@ static void performPeriodicTask( void )
      * function is called.
      */
     SimpleProfile_SetParameter( SIMPLEPROFILE_CHAR4, sizeof(uint8), &valueToCopy);
+		lastChar3Value = valueToCopy;
   }
 }
 
@@ -1076,30 +1429,554 @@ static void performPeriodicTask( void )
 static void simpleProfileChangeCB( uint8 paramID )
 {
   uint8 newValue;
+  uint8 stat;
 
   switch( paramID )
   {
     case SIMPLEPROFILE_CHAR1:
-      SimpleProfile_GetParameter( SIMPLEPROFILE_CHAR1, &newValue );
-
-      #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-        HalLcdWriteStringValue( "Char 1:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
-      #endif
+      stat = SimpleProfile_GetParameter( SIMPLEPROFILE_CHAR1, &newValue );
+			if( stat == SUCCESS )
+			{
+	      #if (defined HAL_LCD) && (HAL_LCD == TRUE)
+	        HalLcdWriteStringValue( "Char 1:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
+	      #endif
+			}
+			else
+			{
+				#if (HAL_UART == TRUE)
+					NPI_PrintString("Char 1: faild \r\n");
+				#endif
+			}
 
       break;
 
     case SIMPLEPROFILE_CHAR3:
-      SimpleProfile_GetParameter( SIMPLEPROFILE_CHAR3, &newValue );
-
-      #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-        HalLcdWriteStringValue( "Char 3:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
-      #endif
+      stat = SimpleProfile_GetParameter( SIMPLEPROFILE_CHAR3, &newValue );
+			if( stat == SUCCESS )
+			{
+	      #if (defined HAL_LCD) && (HAL_LCD == TRUE)
+	        HalLcdWriteStringValue( "Char 3:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
+	      #endif
+			}
+			else
+			{
+				#if (HAL_UART == TRUE)
+					NPI_PrintString("Char 3: faild \r\n");
+				#endif
+			}
 
       break;
+
+		case SIMPLEPROFILE_NOTI_DISABLED:
+			#if (HAL_UART == TRUE)
+				NPI_PrintString("Char 4 notify disabled !\r\n");
+			#endif
+			break;
+
+		case SIMPLEPROFILE_NOTI_ENABLED:
+			#if (HAL_UART == TRUE)
+				NPI_PrintString("Char 4 notify enabled !\r\n");
+			#endif
+			break;
+
+		case SIMPLEPROFILE_INDI_DISABLED:
+			#if (HAL_UART == TRUE)
+				NPI_PrintString("Char 6 indicate disabled !\r\n");
+			#endif
+				break;
+
+		case SIMPLEPROFILE_INDI_ENABLED:
+			#if (HAL_UART == TRUE)
+				NPI_PrintString("Char 6 indicate enabled !\r\n");
+			#endif
+				break;
 
     default:
       // should not reach here!
+      #if (HAL_UART == TRUE)
+				NPI_PrintString("unknow Callback indicating\r\n");
+			#endif
+
       break;
+  }
+}
+
+/*********************************************************************
+ * @fn      simpleProfileSendIndicate
+ *
+ * @brief   Send a simple indication. An incoming indication
+ *          confirmation will trigger the next pending stored measurement.
+ *
+ * @return  none
+ */
+static void simpleProfileSendIndicate(void)
+{
+	uint16 notify_Handle;
+	//uint8 buf[20]={0};
+	uint8 *p;
+	uint8 status;
+
+	GAPRole_GetParameter( GAPROLE_CONNHANDLE, &notify_Handle);
+
+	for(uint8 i = 0; i < 20; i++)
+	{
+		*(p+i) = i;
+	}
+
+	status = SimpleProfile_Char6_Indicate(notify_Handle, p, 20, simpleBLEPeripheral_TaskID);
+
+	#if (defined HAL_UART) && (HAL_UART == TRUE)
+	if(status == SUCCESS)
+	{
+		NPI_PrintString("indicate is seccess to send!\r\n");
+	}
+	else
+	{
+		NPI_PrintString("indicate is fail to send!\r\n");
+	}
+	#endif
+}
+
+/*********************************************************************
+ * @fn      BP Service Callback
+ *
+ * @brief   Callback function for bloodpressure service.
+ *
+ * @param   event - service event
+ *
+ *   Need to know if BP Meas enabled so we can send stored meas. 
+ *
+ *    #define BLOODPRESSURE_MEAS_NOTI_ENABLED         1
+ *    #define BLOODPRESSURE_MEAS_NOTI_DISABLED        2
+ *
+ * @return  none
+ */
+static void bpServiceCB(uint8 event)
+{
+  switch (event)
+  {
+    case BLOODPRESSURE_MEAS_NOTI_ENABLED:
+      osal_set_event( simpleBLEPeripheral_TaskID, SBP_CCC_UPDATE_EVT );
+      break;
+
+    default:
+      break;
+  }
+}
+
+/*********************************************************************
+ * @fn      timeAppStateCB
+ *
+ * @brief   Pairing state callback.
+ *
+ * @return  none
+ */
+static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
+{
+  if ( state == GAPBOND_PAIRING_STATE_STARTED )
+  {
+    timeAppPairingStarted = TRUE;
+
+		#if (defined HAL_UART) && (HAL_UART== TRUE)
+		NPI_PrintString("Pairing started\r\n");
+		#endif
+  }
+  else if ( state == GAPBOND_PAIRING_STATE_COMPLETE )
+  {
+    timeAppPairingStarted = FALSE;
+
+    if ( status == SUCCESS )
+    {
+			#if (defined HAL_UART) && (HAL_UART== TRUE)
+			NPI_PrintString("Pairing success\r\n");
+			#endif
+
+      linkDBItem_t  *pItem;
+
+      if ( (pItem = linkDB_Find( gapConnHandle )) != NULL )
+      {
+        // Store bonding state of pairing
+        timeAppBonded = ( (pItem->stateFlags & LINK_BOUND) == LINK_BOUND );
+
+        if ( timeAppBonded )
+        {
+          osal_memcpy( timeAppBondedAddr, pItem->addr, B_ADDR_LEN );
+        }
+      }
+
+      // If discovery was postponed start discovery
+      if ( timeAppDiscPostponed && timeAppDiscoveryCmpl == FALSE )
+      {
+        timeAppDiscPostponed = FALSE;
+        osal_set_event( simpleBLEPeripheral_TaskID, SBP_START_DISCOVERY_EVT );
+      }
+    }
+		else
+		{
+		  #if (defined HAL_UART) && (HAL_UART== TRUE)
+			NPI_PrintValue(" Pairing fail ", status, 10);
+			NPI_PrintString("!!\r\n");
+			#endif
+		}
+  }
+	else if ( state == GAPBOND_PAIRING_STATE_BONDED )
+  {
+    if ( status == SUCCESS )
+    {
+			#if (defined HAL_UART) && (HAL_UART== TRUE)
+			NPI_PrintString("Bonding success\r\n");
+			#endif
+    }
+  }
+}
+
+/*********************************************************************
+ * @fn      timeAppPasscodeCB
+ *
+ * @brief   Passcode callback.
+ *
+ * @return  none
+ */
+static void timeAppPasscodeCB( uint8 *deviceAddr, uint16 connectionHandle,
+                                        uint8 uiInputs, uint8 uiOutputs )
+{
+	#if (defined HAL_UART) && (HAL_UART== TRUE)
+  uint32  passcode;
+  uint8   str[7];
+
+  // Create random passcode
+  LL_Rand( ((uint8 *) &passcode), sizeof( uint32 ));
+  passcode %= 1000000;
+
+  // Display passcode to user
+  if ( uiOutputs != 0 )
+  {
+		NPI_PrintString("Passcode:\r\n");
+		NPI_PrintString( (uint8 *) _ltoa(passcode, str, 10));
+		NPI_PrintString("\r\n");
+  }
+	#endif
+
+  // Send passcode response
+  GAPBondMgr_PasscodeRsp( connectionHandle, SUCCESS, 0 );
+}
+
+/*********************************************************************
+ * @fn      bpFinalMeas
+ *
+ * @brief   Prepare and send a bloodPressure measurement indication
+ *
+ * @return  none
+ */
+static void bpFinalMeas(void)
+{
+  // BloodPressure measurement value stored in this structure.
+  attHandleValueInd_t  bloodPressureMeas;
+
+  bloodPressureMeas.pValue = GATT_bm_alloc(gapConnHandle, ATT_HANDLE_VALUE_IND,
+                                           BP_MEAS_LEN, NULL);
+  if (bloodPressureMeas.pValue != NULL)
+  {
+    // att value notification structure
+    uint8 *p = bloodPressureMeas.pValue;
+
+    //flags
+    uint8 flags = bloodPressureFlags[bloodPressureFlagsIdx];
+
+    // flags 1 byte long
+    *p++ = flags;
+
+    // Bloodpressure components.
+    *p++ = LO_UINT16(bpSystolic);
+    *p++ = HI_UINT16(bpSystolic);
+    *p++ = LO_UINT16(bpDiastolic);
+    *p++ = HI_UINT16(bpDiastolic);
+    *p++ = LO_UINT16(bpMAP);
+    *p++ = HI_UINT16(bpMAP);
+
+    //timestamp
+    if (flags & BLOODPRESSURE_FLAGS_TIMESTAMP)
+    {
+      UTCTimeStruct time;
+
+      // Get time structure from OSAL
+      osal_ConvertUTCTime( &time, osal_getClock() );
+
+      *p++ = 0x07;
+      *p++ = 0xdb;
+      *p++ = time.month;
+      *p++ = time.day;
+      *p++ = time.hour;
+      *p++ = time.minutes;
+      *p++ = time.seconds;
+
+			#if (defined HAL_UART) && (HAL_UART== TRUE)
+			NPI_PrintValue("bpFinalMeas year ", time.year, 10);
+			NPI_PrintValue(" month ", time.month, 10);
+			NPI_PrintValue(" day ", time.day, 10);
+			NPI_PrintValue(" hour ", time.hour, 10);
+			NPI_PrintValue(" minutes ", time.minutes, 10);
+			NPI_PrintValue(" seconds ", time.seconds, 10);
+			NPI_PrintString("\r\n");
+			#endif
+    }
+
+    if (flags & BLOODPRESSURE_FLAGS_PULSE)
+    {
+      *p++ = LO_UINT16(bpPulseRate);
+      *p++ = HI_UINT16(bpPulseRate);
+    }
+
+    if (flags & BLOODPRESSURE_FLAGS_USER)
+    {
+      *p++ = bpUserId;
+    }
+
+    if (flags & BLOODPRESSURE_FLAGS_STATUS)
+    {
+      *p++ = LO_UINT16(bpMeasStatus);
+      *p++ = HI_UINT16(bpMeasStatus);
+    }
+
+    bloodPressureMeas.len = (uint8) (p - bloodPressureMeas.pValue);
+
+    // store measurment
+    bpStoreIndications(&bloodPressureMeas);
+
+    // send stored measurements
+    bpSendStoredMeas();
+
+    // start disconnect timer
+    osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_DISCONNECT_EVT, BP_DISCONNECT_PERIOD );
+  }
+}
+
+/*********************************************************************
+ * @fn      bpStoreIndications
+ *
+ * @brief   Queue indications
+ *
+ * @return  none
+ */
+static void bpStoreIndications(attHandleValueInd_t *pInd)
+{
+  attHandleValueInd_t *pStoreInd = &bpStoreMeas[bpStoreIndex];
+
+  if (pStoreInd->pValue != NULL)
+  {
+		#if (defined HAL_UART) && (HAL_UART== TRUE)
+		NPI_PrintValue("bpStoreIndications old ", (uint16) pStoreInd->pValue, 10);
+		NPI_PrintString("\r\n");
+		#endif
+
+    // Free old indication's payload.
+    GATT_bm_free((gattMsg_t *)pStoreInd, ATT_HANDLE_VALUE_IND);
+  }
+
+  // Store measurement
+  VOID osal_memcpy(&bpStoreMeas[bpStoreIndex], pInd, sizeof(attHandleValueInd_t));
+
+  // Store index
+  bpStoreIndex = bpStoreIndex + 1;
+  if (bpStoreIndex > BP_STORE_MAX)
+  {
+    bpStoreIndex = 0;
+  }
+
+  if (bpStoreIndex == bpStoreStartIndex)
+  {
+    bpStoreStartIndex = bpStoreStartIndex + 1;
+    if(bpStoreStartIndex > BP_STORE_MAX)
+    {
+      bpStoreStartIndex = 0;
+    }
+  }
+}
+
+/*********************************************************************
+ * @fn      bpSendStoredMeas
+ *
+ * @brief   Send a stored measurement indication. An incoming indication
+ *          confirmation will trigger the next pending stored measurement.
+ *
+ * @return  none
+ */
+static void bpSendStoredMeas(void)
+{
+	#if (defined HAL_UART) && (HAL_UART== TRUE)
+	NPI_PrintValue("bpSendStoredMeas StartIndex ", bpStoreStartIndex, 10);
+	NPI_PrintValue(" bpStoreIndex ", bpStoreIndex, 10);
+	NPI_PrintString("\r\n");
+	#endif
+
+  // We connected to this peer before so send any stored measurements
+  if (bpStoreStartIndex != bpStoreIndex)
+  {
+    attHandleValueInd_t *pStoreInd = &bpStoreMeas[bpStoreStartIndex];
+
+    // Send Measurement - can fail if not connected or CCC not enabled
+    bStatus_t status = BloodPressure_MeasIndicate( gapConnHandle, pStoreInd,
+                                                   simpleBLEPeripheral_TaskID );
+    // If sucess, increment the counters and the indication confirmation
+    // will trigger the next indication if there are more pending.
+    if (status == SUCCESS)
+    {
+      bpStoreStartIndex = bpStoreStartIndex + 1;
+
+      // Wrap around buffer
+      if (bpStoreStartIndex > BP_STORE_MAX)
+      {
+        bpStoreStartIndex = 0;
+      }
+
+      // Clear out this Meas indication.
+      VOID osal_memset( pStoreInd, 0, sizeof(attHandleValueInd_t) );
+
+			#if (defined HAL_UART) && (HAL_UART == TRUE)
+			NPI_PrintString("send bp indicate is seccess\r\n");
+			#endif
+    }
+		else
+		{
+			#if (defined HAL_UART) && (HAL_UART == TRUE)
+			NPI_PrintString("send bp indicate is failed\r\n");
+			#endif
+		}
+  }
+}
+
+/*********************************************************************
+ * @fn      cuffMeas
+ *
+ * @brief   Prepare and send a bloodPressure measurement notification
+ *
+ * @return  none
+ */
+static void cuffMeas(void)
+{
+  attHandleValueNoti_t bloodPressureIMeas;
+
+  HalLedSet ( HAL_LED_2, HAL_LED_MODE_BLINK );
+  HalLedSet ( HAL_LED_3, HAL_LED_MODE_BLINK );
+  HalLedSet ( HAL_LED_4, HAL_LED_MODE_BLINK );
+
+  bloodPressureIMeas.pValue = GATT_bm_alloc(gapConnHandle, ATT_HANDLE_VALUE_NOTI,
+                                            BP_CUFF_MEAS_LEN, NULL);
+  if (bloodPressureIMeas.pValue != NULL)
+  {
+    // ATT value notification structure.
+    uint8 *p = bloodPressureIMeas.pValue;
+
+    //flags
+    uint8 flags = BLOODPRESSURE_FLAGS_MMHG  | BLOODPRESSURE_FLAGS_TIMESTAMP |
+                  BLOODPRESSURE_FLAGS_PULSE | BLOODPRESSURE_FLAGS_USER      |
+                  BLOODPRESSURE_FLAGS_STATUS;
+
+    // flags 1 byte long
+    *p++ = flags;
+
+    //bloodpressure components
+    // IEEE The 16–bit value contains a 4-bit exponent to base 10,
+    // followed by a 12-bit mantissa. Each is in twoscomplementform.
+    *p++ = LO_UINT16(bpSystolic); //120 = 0x0078  SFloat little endian = 0x7800
+    *p++ = HI_UINT16(bpSystolic);
+    *p++ = 0xFF;   //not used in cuff  IEEE NaN =0x07FF
+    *p++ = 0x07;
+    *p++ = 0xFF;   //not used in cuff IEEE NaN =0x07FF
+    *p++ = 0x07;
+
+    // Timestamp.
+    if (flags & BLOODPRESSURE_FLAGS_TIMESTAMP)
+    {
+      UTCTimeStruct time;
+
+      // Get time structure from OSAL
+      osal_ConvertUTCTime( &time, osal_getClock() );
+
+      *p++ = 0x07;
+      *p++ = 0xdb;
+      *p++ = time.month;
+      *p++ = time.day;
+      *p++ = time.hour;
+      *p++ = time.minutes;
+      *p++ = time.seconds;
+
+			#if (defined HAL_UART) && (HAL_UART== TRUE)
+			NPI_PrintValue("cuffMeas year ", time.year, 10);
+			NPI_PrintValue(" month ", time.month, 10);
+			NPI_PrintValue(" day ", time.day, 10);
+			NPI_PrintValue(" hour ", time.hour, 10);
+			NPI_PrintValue(" minutes ", time.minutes, 10);
+			NPI_PrintValue(" seconds ", time.seconds, 10);
+			NPI_PrintString("\r\n");
+			#endif
+    }
+
+    if(flags & BLOODPRESSURE_FLAGS_PULSE)
+    {
+      *p++ = LO_UINT16(bpPulseRate);
+      *p++ = HI_UINT16(bpPulseRate);
+    }
+
+    if(flags & BLOODPRESSURE_FLAGS_USER)
+    {
+      *p++ =  bpUserId;
+    }
+
+    if(flags & BLOODPRESSURE_FLAGS_STATUS)
+    {
+      *p++ = LO_UINT16(bpMeasStatus);
+      *p++ = HI_UINT16(bpMeasStatus);
+    }
+
+    bloodPressureIMeas.len = (uint8) (p - bloodPressureIMeas.pValue);
+
+    // Cuff measurements are not stored, only sent.
+    if ( BloodPressure_IMeasNotify( gapConnHandle, &bloodPressureIMeas,
+                                    simpleBLEPeripheral_TaskID ) != SUCCESS )
+    {
+      GATT_bm_free( (gattMsg_t *)&bloodPressureIMeas, ATT_HANDLE_VALUE_NOTI );
+    }
+  }
+}
+
+/*********************************************************************
+ * @fn      simulateMeas
+ *
+ * @brief   Modify Measurement Values
+ *
+ * @param   none
+ *
+ * @return  none
+ */
+static void simulateMeas( void )
+{
+  if (gapProfileState == GAPROLE_CONNECTED)
+  {
+    if(bpSystolic < 150)
+      bpSystolic +=1;
+    else
+      bpSystolic = 80;
+
+    if(bpDiastolic < 110)
+      bpDiastolic +=1;
+    else
+      bpDiastolic = 90;
+
+    if(bpMAP < 110)
+      bpMAP +=1;
+    else
+      bpMAP =70;
+
+    if(bpPulseRate < 140)
+      bpPulseRate +=1;
+    else
+      bpPulseRate =40;
+
+    if(bpUserId < 5)
+      bpUserId +=1;
+    else
+      bpUserId =1;
   }
 }
 

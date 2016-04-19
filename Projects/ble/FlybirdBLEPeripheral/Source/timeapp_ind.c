@@ -1,12 +1,11 @@
 /**************************************************************************************************
-  Filename:       simpleBLEperipheral.h
-  Revised:        $Date: 2010-08-01 14:03:16 -0700 (Sun, 01 Aug 2010) $
-  Revision:       $Revision: 23256 $
+  Filename:       timeapp_ind.c
+  Revised:        $Date: 2011-06-22 20:44:48 -0700 (Wed, 22 Jun 2011) $
+  Revision:       $Revision: 26428 $
 
-  Description:    This file contains the Simple BLE Peripheral sample application
-                  definitions and prototypes.
+  Description:    Time App indication and notification handling routines.
 
-  Copyright 2010 - 2011 Texas Instruments Incorporated. All rights reserved.
+  Copyright 2011 - 2014 Texas Instruments Incorporated. All rights reserved.
 
   IMPORTANT: Your use of this Software is limited to those specific rights
   granted under the terms of a software license agreement between the user
@@ -37,68 +36,103 @@
   contact Texas Instruments Incorporated at www.TI.com.
 **************************************************************************************************/
 
-#ifndef SIMPLEBLEPERIPHERAL_H
-#define SIMPLEBLEPERIPHERAL_H
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 /*********************************************************************
  * INCLUDES
  */
+
+#include "string.h"
+#include "bcomdef.h"
+#include "OSAL.h"
+#include "OnBoard.h"
+#include "gatt.h"
+#include "gatt_uuid.h"
+#include "gattservapp.h"
+#include "timeapp.h"
+
+/*********************************************************************
+ * MACROS
+ */
+
+// Maximum category ID value
+#define ALERT_CAT_ID_MAX            9
+
+// Parse major category
+#define ALERT_MAJOR_CAT(x)          ( (x) >> 3 )
+
+// Parse subcategory
+#define ALERT_SUBCAT(x)             ( (x) & 0x07 )
 
 /*********************************************************************
  * CONSTANTS
  */
 
 
-// Simple BLE Peripheral Task Events
-#define SBP_START_DEVICE_EVT                              0x0001
-#define SBP_PERIODIC_EVT                                  0x0002
-#define SBP_POWERON_LED_TIMEOUT_EVT												0x0004
-
-#define SBP_TIMER_BPMEAS_EVT                              0x0008
-#define SBP_START_DISCOVERY_EVT														0x0010
-#define SBP_TIMER_CUFF_EVT                             		0x0012
-#define SBP_CCC_UPDATE_EVT                             		0x0014
-#define SBP_DISCONNECT_EVT                             		0x0018
+/*********************************************************************
+ * TYPEDEFS
+ */
 
 /*********************************************************************
- * MACROS
+ * GLOBAL VARIABLES
  */
+
+/*********************************************************************
+ * EXTERNAL VARIABLES
+ */
+
+/*********************************************************************
+ * EXTERNAL FUNCTIONS
+ */
+
+/*********************************************************************
+ * LOCAL VARIABLES
+ */
+
+/*********************************************************************
+ * LOCAL FUNCTIONS
+ */
+
+/*********************************************************************
+ * @fn      timeAppIndGattMsg
+ *
+ * @brief   Handle indications and notifications. 
+ *
+ * @param   pMsg - GATT message.
+ *
+ * @return  none
+ */
+void timeAppIndGattMsg( gattMsgEvent_t *pMsg )
+{
+  uint8 i;
+  
+  // Look up the handle in the handle cache
+  for ( i = 0; i < HDL_CACHE_LEN; i++ )
+  {
+    if ( pMsg->msg.handleValueNoti.handle == timeAppHdlCache[i] )
+    {
+      break;
+    }
+  }
+
+  // Perform processing for this handle 
+  switch ( i )
+  {
+    case HDL_CURR_TIME_CT_TIME_START:
+      // Set clock to time read from time server
+      timeAppClockSet( pMsg->msg.handleValueNoti.pValue );
+      break;
+      
  
-// LCD macros
-#if HAL_LCD == TRUE
-#define LCD_WRITE_STRING(str, option)                       HalLcdWriteString( (str), (option))
-#define LCD_WRITE_SCREEN(line1, line2)                      HalLcdWriteScreen( (line1), (line2) )
-#define LCD_WRITE_STRING_VALUE(title, value, format, line)  HalLcdWriteStringValue( (title), (value), (format), (line) )
-#else
-#define LCD_WRITE_STRING(str, option)                     
-#define LCD_WRITE_SCREEN(line1, line2)                    
-#define LCD_WRITE_STRING_VALUE(title, value, format, line)
-#endif
+     default:
+      break;
+  }
+  
+  // Send confirm for indication
+  if ( pMsg->method == ATT_HANDLE_VALUE_IND )
+  {
+    ATT_HandleValueCfm( pMsg->connHandle );
+  }
+}
 
-/*********************************************************************
- * FUNCTIONS
- */
-
-/*
- * Task Initialization for the BLE Application
- */
-extern void SimpleBLEPeripheral_Init( uint8 task_id );
-
-/*
- * Task Event Processor for the BLE Application
- */
-extern uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events );
 
 /*********************************************************************
 *********************************************************************/
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* SIMPLEBLEPERIPHERAL_H */

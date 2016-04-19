@@ -1,12 +1,11 @@
 /**************************************************************************************************
-  Filename:       simpleBLEperipheral.h
-  Revised:        $Date: 2010-08-01 14:03:16 -0700 (Sun, 01 Aug 2010) $
-  Revision:       $Revision: 23256 $
+  Filename:       timeapp_clock.c
+  Revised:        $Date: 2011-06-22 20:44:48 -0700 (Wed, 22 Jun 2011) $
+  Revision:       $Revision: 26428 $
 
-  Description:    This file contains the Simple BLE Peripheral sample application
-                  definitions and prototypes.
+  Description:    Time clock display and timekeeping for Time App.
 
-  Copyright 2010 - 2011 Texas Instruments Incorporated. All rights reserved.
+  Copyright 2011 Texas Instruments Incorporated. All rights reserved.
 
   IMPORTANT: Your use of this Software is limited to those specific rights
   granted under the terms of a software license agreement between the user
@@ -37,16 +36,20 @@
   contact Texas Instruments Incorporated at www.TI.com.
 **************************************************************************************************/
 
-#ifndef SIMPLEBLEPERIPHERAL_H
-#define SIMPLEBLEPERIPHERAL_H
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 /*********************************************************************
  * INCLUDES
+ */
+
+#include "bcomdef.h"
+#include "OSAL.h"
+#include "OSAL_Clock.h"
+#include "OnBoard.h"
+#include "hal_led.h"
+#include "hal_key.h"
+#include "timeapp.h"
+
+/*********************************************************************
+ * MACROS
  */
 
 /*********************************************************************
@@ -54,51 +57,70 @@ extern "C"
  */
 
 
-// Simple BLE Peripheral Task Events
-#define SBP_START_DEVICE_EVT                              0x0001
-#define SBP_PERIODIC_EVT                                  0x0002
-#define SBP_POWERON_LED_TIMEOUT_EVT												0x0004
-
-#define SBP_TIMER_BPMEAS_EVT                              0x0008
-#define SBP_START_DISCOVERY_EVT														0x0010
-#define SBP_TIMER_CUFF_EVT                             		0x0012
-#define SBP_CCC_UPDATE_EVT                             		0x0014
-#define SBP_DISCONNECT_EVT                             		0x0018
+/*********************************************************************
+ * TYPEDEFS
+ */
 
 /*********************************************************************
- * MACROS
+ * GLOBAL VARIABLES
  */
- 
-// LCD macros
-#if HAL_LCD == TRUE
-#define LCD_WRITE_STRING(str, option)                       HalLcdWriteString( (str), (option))
-#define LCD_WRITE_SCREEN(line1, line2)                      HalLcdWriteScreen( (line1), (line2) )
-#define LCD_WRITE_STRING_VALUE(title, value, format, line)  HalLcdWriteStringValue( (title), (value), (format), (line) )
-#else
-#define LCD_WRITE_STRING(str, option)                     
-#define LCD_WRITE_SCREEN(line1, line2)                    
-#define LCD_WRITE_STRING_VALUE(title, value, format, line)
-#endif
 
 /*********************************************************************
- * FUNCTIONS
+ * EXTERNAL VARIABLES
  */
 
-/*
- * Task Initialization for the BLE Application
+/*********************************************************************
+ * EXTERNAL FUNCTIONS
  */
-extern void SimpleBLEPeripheral_Init( uint8 task_id );
 
-/*
- * Task Event Processor for the BLE Application
+/*********************************************************************
+ * LOCAL VARIABLES
  */
-extern uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events );
+
+
+/*********************************************************************
+ * LOCAL FUNCTIONS
+ */
+
+
+/*********************************************************************
+ * @fn      timeAppClockSet()
+ *
+ * @brief   Set the clock. 
+ *
+ * @param   pData - Pointer to a Date Time characteristic structure
+ *
+ * @return  none
+ */
+void timeAppClockSet( uint8 *pData )
+{
+  UTCTimeStruct time;
+  
+  // Parse time service structure to OSAL time structure
+  time.year = BUILD_UINT16(pData[0], pData[1]);
+  if ( time.year == 0 )
+  {
+    time.year = 2000;
+  }
+  pData += 2;
+  time.month = *pData++;
+  if ( time.month > 0 )
+  {
+   // time.month--;
+  }
+  time.day = *pData++;
+  if ( time.day > 0 )
+  {
+  //  time.day--;
+  }
+  time.hour = *pData++;
+  time.minutes = *pData++;
+  time.seconds = *pData;
+  
+  // Update OSAL time
+  osal_setClock( osal_ConvertUTCSecs( &time ) );
+  
+}
 
 /*********************************************************************
 *********************************************************************/
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* SIMPLEBLEPERIPHERAL_H */

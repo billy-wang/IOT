@@ -1,12 +1,12 @@
 /**************************************************************************************************
-  Filename:       simpleBLEperipheral.h
-  Revised:        $Date: 2010-08-01 14:03:16 -0700 (Sun, 01 Aug 2010) $
-  Revision:       $Revision: 23256 $
+  Filename:       timeapp.h
+  Revised:        $Date: 2011-06-22 20:44:48 -0700 (Wed, 22 Jun 2011) $
+  Revision:       $Revision: 26428 $
 
-  Description:    This file contains the Simple BLE Peripheral sample application
+  Description:    This file contains the Time App sample application
                   definitions and prototypes.
 
-  Copyright 2010 - 2011 Texas Instruments Incorporated. All rights reserved.
+  Copyright 2011 Texas Instruments Incorporated. All rights reserved.
 
   IMPORTANT: Your use of this Software is limited to those specific rights
   granted under the terms of a software license agreement between the user
@@ -37,8 +37,10 @@
   contact Texas Instruments Incorporated at www.TI.com.
 **************************************************************************************************/
 
-#ifndef SIMPLEBLEPERIPHERAL_H
-#define SIMPLEBLEPERIPHERAL_H
+#ifndef TIMEAPP_H
+#define TIMEAPP_H
+
+#include "gatt.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -53,32 +55,50 @@ extern "C"
  * CONSTANTS
  */
 
+// Time App discovery states
+enum
+{
+  DISC_IDLE = 0x00,                       // Idle state
+  DISC_CURR_TIME_START = 0x10,            // Current time service
+  DISC_CURR_TIME_SVC,                     // Discover service
+  DISC_CURR_TIME_CHAR,                    // Discover all characteristics
+  DISC_CURR_TIME_CT_TIME_CCCD,            // Discover CT time CCCD
+  DISC_FAILED = 0xFF                      // Discovery failed
+};
 
-// Simple BLE Peripheral Task Events
-#define SBP_START_DEVICE_EVT                              0x0001
-#define SBP_PERIODIC_EVT                                  0x0002
-#define SBP_POWERON_LED_TIMEOUT_EVT												0x0004
+// Time App handle cache indexes
+enum
+{
+  HDL_CURR_TIME_CT_TIME_START,            // Current time start handle
+  HDL_CURR_TIME_CT_TIME_END,              // Current time end handle
+  HDL_CURR_TIME_CT_TIME_CCCD,             // Current time CCCD
+  HDL_CACHE_LEN
+};
 
-#define SBP_TIMER_BPMEAS_EVT                              0x0008
-#define SBP_START_DISCOVERY_EVT														0x0010
-#define SBP_TIMER_CUFF_EVT                             		0x0012
-#define SBP_CCC_UPDATE_EVT                             		0x0014
-#define SBP_DISCONNECT_EVT                             		0x0018
+// Configuration states
+#define TIMEAPP_CONFIG_START              0x00
+#define TIMEAPP_CONFIG_CMPL               0xFF
 
 /*********************************************************************
  * MACROS
  */
- 
-// LCD macros
-#if HAL_LCD == TRUE
-#define LCD_WRITE_STRING(str, option)                       HalLcdWriteString( (str), (option))
-#define LCD_WRITE_SCREEN(line1, line2)                      HalLcdWriteScreen( (line1), (line2) )
-#define LCD_WRITE_STRING_VALUE(title, value, format, line)  HalLcdWriteStringValue( (title), (value), (format), (line) )
-#else
-#define LCD_WRITE_STRING(str, option)                     
-#define LCD_WRITE_SCREEN(line1, line2)                    
-#define LCD_WRITE_STRING_VALUE(title, value, format, line)
-#endif
+
+
+/*********************************************************************
+ * GLOBAL
+ */
+
+// Task ID
+extern uint8 simpleBLEPeripheral_TaskID;
+
+// Connection handle
+extern uint16 gapConnHandle;
+
+// Handle cache
+extern uint16 timeAppHdlCache[HDL_CACHE_LEN];
+
+// Task ID
+extern uint8 timeConfigDone;
 
 /*********************************************************************
  * FUNCTIONS
@@ -87,12 +107,34 @@ extern "C"
 /*
  * Task Initialization for the BLE Application
  */
-extern void SimpleBLEPeripheral_Init( uint8 task_id );
+extern void TimeApp_Init( uint8 task_id );
 
 /*
  * Task Event Processor for the BLE Application
  */
-extern uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events );
+extern uint16 TimeApp_ProcessEvent( uint8 task_id, uint16 events );
+
+/*
+ * Time App clock functions
+ */
+extern void timeAppClockSet( uint8 *pData );
+
+/* 
+ * Time App service discovery functions
+ */
+extern uint8 timeAppDiscStart( void );
+extern uint8 timeAppDiscGattMsg( uint8 state, gattMsgEvent_t *pMsg );
+
+/* 
+ * Time App characteristic configuration functions
+ */
+extern uint8 timeAppConfigNext( uint8 state );
+extern uint8 timeAppConfigGattMsg( uint8 state, gattMsgEvent_t *pMsg );
+
+/* 
+ * Time App indication and notification handling functions
+ */
+extern void timeAppIndGattMsg( gattMsgEvent_t *pMsg );
 
 /*********************************************************************
 *********************************************************************/
@@ -101,4 +143,4 @@ extern uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events );
 }
 #endif
 
-#endif /* SIMPLEBLEPERIPHERAL_H */
+#endif /* TIMEAPP_H */

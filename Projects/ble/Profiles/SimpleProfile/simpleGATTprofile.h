@@ -79,6 +79,12 @@ extern "C"
 #define SIMPLEPROFILE_CHAR5_LEN           5  
 #define SIMPLEPROFILE_CHAR6_LEN           20
 
+// Callback events
+#define SIMPLEPROFILE_NOTI_DISABLED				11
+#define SIMPLEPROFILE_NOTI_ENABLED				12
+#define SIMPLEPROFILE_INDI_DISABLED				13
+#define SIMPLEPROFILE_INDI_ENABLED				14
+
 /*********************************************************************
  * TYPEDEFS
  */
