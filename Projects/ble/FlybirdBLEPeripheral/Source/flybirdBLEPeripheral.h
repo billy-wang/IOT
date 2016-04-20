@@ -61,9 +61,9 @@ extern "C"
 
 #define SBP_TIMER_BPMEAS_EVT                              0x0008
 #define SBP_START_DISCOVERY_EVT														0x0010
-#define SBP_TIMER_CUFF_EVT                             		0x0012
-#define SBP_CCC_UPDATE_EVT                             		0x0014
-#define SBP_DISCONNECT_EVT                             		0x0018
+#define SBP_TIMER_CUFF_EVT                             		0x0020
+#define SBP_CCC_UPDATE_EVT                             		0x0040
+#define SBP_DISCONNECT_EVT                             		0x0080
 
 /*********************************************************************
  * MACROS

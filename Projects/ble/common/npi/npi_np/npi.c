@@ -243,7 +243,9 @@ uint16 NPI_GetMaxTxBufSize( void )
  */
 void NPI_PrintString(uint8 *buf)
 {
+#if (HAL_UART== TRUE)
 	NPI_WriteTransport(buf, osal_strlen((char*)buf));
+#endif
 }
 
 
@@ -267,6 +269,7 @@ void NPI_PrintString(uint8 *buf)
  */
 void NPI_PrintValue(char *title, uint16 value, uint8 format)
 {
+#if (HAL_UART== TRUE)
   uint8 tmpLen;
   uint8 buf[128];
   uint32 err;
@@ -277,6 +280,7 @@ void NPI_PrintValue(char *title, uint16 value, uint8 format)
   err = (uint32)(value);
   _ltoa( err, &buf[tmpLen+1], format );
   NPI_PrintString(buf);
+#endif
 }
 
 

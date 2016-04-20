@@ -106,13 +106,13 @@
 
 
 // Minimum connection interval (units of 1.25ms, 80=100ms) if automatic parameter update request is enabled
-#define DEFAULT_DESIRED_MIN_CONN_INTERVAL     80
+#define DEFAULT_DESIRED_MIN_CONN_INTERVAL     200//80
 
 // Maximum connection interval (units of 1.25ms, 800=1000ms) if automatic parameter update request is enabled
-#define DEFAULT_DESIRED_MAX_CONN_INTERVAL     800
+#define DEFAULT_DESIRED_MAX_CONN_INTERVAL     1600//800
 
 // Slave latency to use if automatic parameter update request is enabled
-#define DEFAULT_DESIRED_SLAVE_LATENCY         0
+#define DEFAULT_DESIRED_SLAVE_LATENCY         1
 
 // Supervision timeout value (units of 10ms, 1000=10s) if automatic parameter update request is enabled
 #define DEFAULT_DESIRED_CONN_TIMEOUT          1000
@@ -120,8 +120,11 @@
 // Some values used to simulate measurements
 #define FLAGS_IDX_MAX                         7      //3 flags c/f -- timestamp -- site
 
+// Length of bd addr as a string
+#define B_ADDR_STR_LEN                        15
+
 // Whether to enable automatic parameter update request when a connection is formed
-#define DEFAULT_ENABLE_UPDATE_REQUEST         TRUE
+#define DEFAULT_ENABLE_UPDATE_REQUEST         FALSE
 
 // Connection Pause Peripheral time value (in seconds)
 #define DEFAULT_CONN_PAUSE_PERIPHERAL         6
@@ -131,8 +134,20 @@
 
 #define INVALID_CONNHANDLE                    0xFFFF
 
-// Length of bd addr as a string
-#define B_ADDR_STR_LEN                        15
+// Default GAP pairing mode
+#define DEFAULT_PAIRING_MODE                  GAPBOND_PAIRING_MODE_INITIATE
+
+// Default MITM mode (TRUE to require passcode or OOB when pairing)
+#define DEFAULT_MITM_MODE                     FALSE
+
+// Default bonding mode, TRUE to bond
+#define DEFAULT_BONDING_MODE                  TRUE
+
+// Default GAP bonding I/O capabilities
+#define DEFAULT_IO_CAPABILITIES               GAPBOND_IO_CAP_DISPLAY_ONLY
+
+// Delay to begin discovery from start of connection in ms
+#define DEFAULT_DISCOVERY_DELAY               1000
 
 #define BP_DISCONNECT_PERIOD                  6000
 
@@ -155,6 +170,9 @@
  */
 // Task ID for internal task/event processing
 uint8 simpleBLEPeripheral_TaskID;
+
+// Connection handle
+uint16 gapConnHandle;
 
 // Time stamp read from server
 uint8 timeConfigDone;
@@ -260,7 +278,7 @@ static uint8 lastConnAddr[B_ADDR_LEN] = {0xf,0xf,0xf,0xf,0xf,0xe};;
 static bool connectedToLastAddress = false;
 
 // GAP connection handle
-uint16 gapConnHandle;
+//uint16 gapConnHandle;
 
 static uint16 bpSystolic = 120; //mmg
 static uint16 bpDiastolic = 80; //mmg
@@ -284,6 +302,22 @@ static const uint8 bloodPressureFlags[FLAGS_IDX_MAX] =
   0x00
 };
 
+// Program State
+enum
+{
+  BPM_STATE_IDLE,            
+  BPM_STATE_ADVERTISING,              
+  BPM_STATE_CONNECTED             
+};
+
+// Measurement State
+enum
+{
+  BPM_MEAS_STATE_IDLE,            
+  BPM_MEAS_STATE_ACTIVE,             
+  BPM_MEAS_STATE_READY            
+};
+
 // initial value of flags
 static uint8 bloodPressureFlagsIdx = 0;
 
@@ -295,6 +329,8 @@ static uint8 bpStoreStartIndex = 0;
 static uint8 bpStoreIndex = 0;
 
 static uint8 lastChar3Value = 0;
+
+static bool connected = false;
 
 /*********************************************************************
  * LOCAL FUNCTIONS
@@ -320,11 +356,7 @@ static void simulateMeas( void );
 static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys );
 #endif
 
-#if (defined HAL_LCD) && (HAL_LCD == TRUE)
 static char *bdAddr2Str ( uint8 *pAddr );
-#endif
-
-
 
 /*********************************************************************
  * PROFILE CALLBACKS
@@ -338,7 +370,7 @@ static gapRolesCBs_t simpleBLEPeripheral_PeripheralCBs =
 };
 
 // GAP Bond Manager Callbacks
-static gapBondCBs_t timeApp_BondMgrCBs =
+static const gapBondCBs_t timeApp_BondMgrCBs =
 {
   timeAppPasscodeCB,                     // Passcode callback (not used by application)
   timeAppPairStateCB                      // Pairing / Bonding state Callback (not used by application)
@@ -458,7 +490,7 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
   {
     uint32 passkey = 0; // passkey "000000"
     uint8 pairMode = GAPBOND_PAIRING_MODE_WAIT_FOR_REQ;
-    uint8 mitm = TRUE;
+    uint8 mitm = FALSE;
     uint8 ioCap = GAPBOND_IO_CAP_DISPLAY_ONLY;
     uint8 bonding = TRUE;
     GAPBondMgr_SetParameter( GAPBOND_DEFAULT_PASSCODE, sizeof ( uint32 ), &passkey );
@@ -541,8 +573,6 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
 #endif
 #endif // #if (defined HAL_KEY) && (HAL_KEY == TRUE)
 
-#if (defined HAL_LCD) && (HAL_LCD == TRUE)
-
 #if defined FEATURE_OAD
   #if defined (HAL_IMAGE_A)
     HalLcdWriteStringValue( "BLE Peri-A", OAD_VER_NUM( _imgHdr.ver ), 16, HAL_LCD_LINE_1 );
@@ -552,8 +582,6 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
 #else
   HalLcdWriteString( "BLE Peripheral", HAL_LCD_LINE_1 );
 #endif // FEATURE_OAD
-
-#endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
 
   // Register callback with SimpleGATTprofile
   VOID SimpleProfile_RegisterAppCBs( &simpleBLEPeripheral_SimpleProfileCBs );
@@ -602,6 +630,8 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
  */
 uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
 {
+	NPI_PrintValue("ProcessEvent ", events, 16);
+	NPI_PrintString("\r\n");
 
   VOID task_id; // OSAL required parameter that isn't used in this function
 
@@ -633,7 +663,7 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
     VOID GAPRole_StartDevice( &simpleBLEPeripheral_PeripheralCBs );
 
     // Start Bond Manager
-    VOID GAPBondMgr_Register( &timeApp_BondMgrCBs );
+    GAPBondMgr_Register( (gapBondCBs_t *) &timeApp_BondMgrCBs );
 
     // Set timer for first periodic event
     osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_PERIODIC_EVT, SBP_PERIODIC_EVT_PERIOD );
@@ -710,24 +740,23 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
   ////////////////////////////////////////////////////////////////////
   if ( events & SBP_TIMER_CUFF_EVT )
   {
-    // Perform a Cutoff Measurement
-    cuffMeas();
+		// Perform a Cutoff Measurement
+		cuffMeas();
 
-    cuffCount++;
+		cuffCount++;
 
-    // If cuff count not met, keep sending cuff measurements
-    if(cuffCount < CUFF_MAX)
-    {
-      // Start interval timer to send BP, just for simulation
-      osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
-
-    }
-    // Get ready to send final measurement
-    else
-    {
-      // Start timer to send final BP meas
-      osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_BPMEAS_EVT, TIMER_CUFF_PERIOD );
-    }
+		// If cuff count not met, keep sending cuff measurements
+		if(cuffCount < CUFF_MAX)
+		{
+			// Start interval timer to send BP, just for simulation
+			osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
+		}
+		// Get ready to send final measurement
+		else
+		{
+			// Start timer to send final BP meas
+			osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_BPMEAS_EVT, TIMER_CUFF_PERIOD );
+		}
 
     return (events ^ SBP_TIMER_CUFF_EVT);
   }
@@ -826,70 +855,58 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
 
   if ( keys & HAL_KEY_UP )
   {
-
 		SK_Keys |= HAL_KEY_UP;
 
-		#if (defined HAL_LCD) && (HAL_UART == TRUE)
 		HalLcdWriteString( "JOY UP Press", HAL_LCD_LINE_3 );
-		#endif
-  }
+		NPI_PrintString( "JOY UP Press\r\n");
 
-  if ( keys & HAL_KEY_RIGHT )
-  {
-
-		SK_Keys |= HAL_KEY_RIGHT;
-
-		#if (defined HAL_LCD) && (HAL_UART == TRUE)
-		HalLcdWriteString( "JOY RIGHT Press", HAL_LCD_LINE_3 );
-		#endif
+		// set simulated measurement flag index
+    if (++bloodPressureFlagsIdx == FLAGS_IDX_MAX)
+    {
+      bloodPressureFlagsIdx = 0;
+    }
   }
 
   if ( keys & HAL_KEY_CENTER )
   {
-
 		SK_Keys |= HAL_KEY_CENTER;
 
-		#if (defined HAL_LCD) && (HAL_UART == TRUE)
 		HalLcdWriteString( "JOY CENTER Press", HAL_LCD_LINE_3 );
-		#endif
+		NPI_PrintString( "JOY CENTER Press\r\n");
   }
 
   if ( keys & HAL_KEY_LEFT )
   {
-
 		SK_Keys |= HAL_KEY_LEFT;
 
-	#if (defined HAL_LCD) && (HAL_UART == TRUE)
-			HalLcdWriteString( "JOY LEFT Press", HAL_LCD_LINE_3 );
-	#endif
+		HalLcdWriteString( "JOY LEFT Press", HAL_LCD_LINE_3 );
+		NPI_PrintString( "JOY LEFT Press\r\n");
 
 		simpleProfileSendIndicate();
   }
 
   if ( keys & HAL_KEY_DOWN )
   {
-
 		SK_Keys |= HAL_KEY_DOWN;
 
-		#if (defined HAL_LCD) && (HAL_UART == TRUE)
 		HalLcdWriteString( "JOY DOWN Press", HAL_LCD_LINE_3 );
-		#endif
+		NPI_PrintString( "JOY DOWN Press\r\n");
   }
 
   if ( keys & HAL_KEY_SW_7 )
   {
-
 		SK_Keys |= HAL_KEY_SW_7;
 
-		#if (defined HAL_LCD) && (HAL_UART == TRUE)
 		HalLcdWriteString( "Button 2 Press", HAL_LCD_LINE_3 );
-		#endif
+		NPI_PrintString( "Button 2 Press\r\n");
   }
 
   if ( keys & HAL_KEY_SW_2 )
   {
-
     SK_Keys |= SK_KEY_RIGHT;
+
+		HalLcdWriteString( "JOY RIGHT Press", HAL_LCD_LINE_3 );
+		NPI_PrintString( "JOY RIGHT Press\r\n");
 
     // if device is not in a connection, pressing the right key should toggle
     // advertising on and off
@@ -949,101 +966,126 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
  */
 static void simpleBLEPeripheral_ProcessGATTMsg( gattMsgEvent_t *pMsg )
 {
-	#if (defined HAL_LCD) && (HAL_LCD == TRUE)
-	HalLcdWriteString( (char *)pMsg->method,	HAL_LCD_LINE_3 );
-
 	//Measurement Indication Confirmation
 	switch (pMsg->method)
 	{
 		case ATT_ERROR_RSP :
 			HalLcdWriteString("Error Resp",  HAL_LCD_LINE_3 );
+			NPI_PrintString("Error Resp\r\n");
 			break;
 		case ATT_EXCHANGE_MTU_REQ :
 			HalLcdWriteString("Exch MTU Req",  HAL_LCD_LINE_3 );
+			NPI_PrintString("Exch MTU Req\r\n");
 			break;
 		case ATT_EXCHANGE_MTU_RSP :
 			HalLcdWriteString("Exch MTU Resp",  HAL_LCD_LINE_3 );
+			NPI_PrintString("Exch MTU Resp\r\n");
 			break;
 		case ATT_FIND_INFO_REQ :
 			HalLcdWriteString("Find Info Req",	HAL_LCD_LINE_3 );
+			NPI_PrintString("Find Info Req\r\n");
 			break;
 		case ATT_FIND_INFO_RSP :
 			HalLcdWriteString("Find Info Resp",	HAL_LCD_LINE_3 );
+			NPI_PrintString("Find Info Resp\r\n");
 			break;
 		case ATT_FIND_BY_TYPE_VALUE_REQ :
 			HalLcdWriteString("Find vaue Req", HAL_LCD_LINE_3 );
+			NPI_PrintString("Find vaue Req\r\n");
 			break;
 		case ATT_FIND_BY_TYPE_VALUE_RSP :
 			HalLcdWriteString("Find vaue Resp", HAL_LCD_LINE_3 );
+			NPI_PrintString("Find vaue Resp\r\n");
 			break;
 		case ATT_READ_BY_TYPE_REQ :
 			HalLcdWriteString("Read Type Req", HAL_LCD_LINE_3 );
+			NPI_PrintString("Read Type Req\r\n");
 			break;
 		case ATT_READ_BY_TYPE_RSP :
 			HalLcdWriteString("Read Type Resp", HAL_LCD_LINE_3 );
+			NPI_PrintString("Read Type Resp\r\n");
 			break;
 		case ATT_READ_REQ :
 			HalLcdWriteString("Read Req", HAL_LCD_LINE_3 );
+			NPI_PrintString("Read Req\r\n");
 			break;
 		case ATT_READ_RSP :
 			HalLcdWriteString("Read Resp", HAL_LCD_LINE_3 );
+			NPI_PrintString("Read Resp\r\n");
 			break;
 		case ATT_READ_BLOB_REQ :
 			HalLcdWriteString("Read Blob Req", HAL_LCD_LINE_3 );
+			NPI_PrintString("Read Blob Req\r\n");
 			break;
 		case ATT_READ_BLOB_RSP :
 			HalLcdWriteString("Read Blob Resp", HAL_LCD_LINE_3 );
+			NPI_PrintString("Read Blob Resp\r\n");
 			break;
 		case ATT_READ_MULTI_REQ :
 			HalLcdWriteString("Read Multi Req", HAL_LCD_LINE_3 );
+			NPI_PrintString("Read Multi Req\r\n");
 			break;
 		case ATT_READ_MULTI_RSP :
 			HalLcdWriteString("Read Multi Resp", HAL_LCD_LINE_3 );
+			NPI_PrintString("Error Resp\r\n");
 			break;
 		case ATT_READ_BY_GRP_TYPE_REQ :
 			HalLcdWriteString("Read Type Req", HAL_LCD_LINE_3 );
+			NPI_PrintString("Read Type Req\r\n");
 			break;
 		case ATT_READ_BY_GRP_TYPE_RSP :
 			HalLcdWriteString("Read Type Resp", HAL_LCD_LINE_3 );
+			NPI_PrintString("Read Type Resp\r\n");
 			break;
 		case ATT_WRITE_REQ :
 			HalLcdWriteString("Write Req", HAL_LCD_LINE_3 );
+			NPI_PrintString("Write Req\r\n");
 			break;
 		case ATT_WRITE_RSP :
 			HalLcdWriteString("Write Resp", HAL_LCD_LINE_3 );
+			NPI_PrintString("Write Resp\r\n");
 			break;
 		case ATT_PREPARE_WRITE_REQ :
 			HalLcdWriteString("Prep Write Req", HAL_LCD_LINE_3 );
+			NPI_PrintString("Prep Write Req\r\n");
 			break;
 		case ATT_PREPARE_WRITE_RSP :
 			HalLcdWriteString("Prep Write Resp", HAL_LCD_LINE_3 );
+			NPI_PrintString("Prep Write Resp\r\n");
 			break;
 		case ATT_EXECUTE_WRITE_REQ :
 			HalLcdWriteString("Exec Write Req", HAL_LCD_LINE_3 );
+			NPI_PrintString("Exec Write Req\r\n");
 			break;
 		case ATT_EXECUTE_WRITE_RSP :
 			HalLcdWriteString("Exec Write Resp", HAL_LCD_LINE_3 );
+			NPI_PrintString("Exec Write Resp\r\n");
 			break;
 		case ATT_HANDLE_VALUE_NOTI :
 			HalLcdWriteString("Handle Noti", HAL_LCD_LINE_3 );
+			NPI_PrintString("Handle Noti\r\n");
 			break;
 		case ATT_HANDLE_VALUE_IND :
 			HalLcdWriteString("Handle Ind", HAL_LCD_LINE_3 );
+			NPI_PrintString("Handle Ind\r\n");
 			break;
 		case ATT_HANDLE_VALUE_CFM :
 			HalLcdWriteString("Handle Cfm", HAL_LCD_LINE_3 );
+			NPI_PrintString("Handle Cfm\r\n");
 			break;
 		case ATT_WRITE_CMD :
 			HalLcdWriteString("Write Command", HAL_LCD_LINE_3 );
+			NPI_PrintString("Write Command\r\n");
 			break;
 		case ATT_SIGNED_WRITE_CMD :
 			HalLcdWriteString("Signed W Command", HAL_LCD_LINE_3 );
+			NPI_PrintString("Signed W Command\r\n");
 			break;
 		default:
 			HalLcdWriteString("Unknown", HAL_LCD_LINE_3 );
+			NPI_PrintString("Unknown\r\n");
 			break;
 	}
-	#endif
 
   // Measurement Indication Confirmation
   if( pMsg->method == ATT_HANDLE_VALUE_CFM)
@@ -1149,34 +1191,24 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 
         DevInfo_SetParameter(DEVINFO_SYSTEM_ID, DEVINFO_SYSTEM_ID_LEN, systemId);
 
-				#if (defined HAL_LCD) && (HAL_LCD == TRUE)
 				// Display device address
 				HalLcdWriteString( bdAddr2Str( ownAddress ),  HAL_LCD_LINE_2 );
 				HalLcdWriteString( "Initialized",  HAL_LCD_LINE_3 );
-        #endif
-
-				#if (defined HAL_UART) && (HAL_UART == TRUE)
 				NPI_PrintString("Initialized\r\n");
-				#endif
       }
       break;
 
     case GAPROLE_ADVERTISING:
       {
-				#if (defined HAL_LCD) && (HAL_LCD == TRUE)
 				uint8 ownAddress[B_ADDR_LEN];
 				GAPRole_GetParameter(GAPROLE_BD_ADDR, ownAddress);
 				// Display device address
 				HalLcdWriteString( bdAddr2Str( ownAddress ),  HAL_LCD_LINE_2 );
 				HalLcdWriteString( "Advertising",  HAL_LCD_LINE_3 );
-				#endif
+				NPI_PrintString("Advertising\r\n");
 
 				#if (defined HAL_LED) && (HAL_LED == TRUE)
 				HalLedSet( HAL_LED_2, HAL_LED_MODE_ON );
-				#endif
-
-				#if (defined HAL_UART) && (HAL_UART == TRUE)
-				NPI_PrintString("Advertising\r\n");
 				#endif
       }
 			break;
@@ -1203,13 +1235,8 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
       
     case GAPROLE_CONNECTED:
       {        
-        #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-          HalLcdWriteString( "Connected",  HAL_LCD_LINE_3 );
-        #endif
-
-				#if (defined HAL_UART) && (HAL_UART == TRUE)
+        HalLcdWriteString( "Connected",  HAL_LCD_LINE_3 );
 				NPI_PrintString("Connected\r\n");
-				#endif
 
 				#if (defined HAL_LED) && (HAL_LED == TRUE)
 				HalLedSet( HAL_LED_2, HAL_LED_MODE_OFF );
@@ -1253,6 +1280,8 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 
 				}
 
+				connected=true;
+
 #ifdef PLUS_BROADCASTER
         // Only turn advertising on for this state when we first connect
         // otherwise, when we go from connected_advertising back to this state
@@ -1280,25 +1309,17 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 
     case GAPROLE_CONNECTED_ADV:
       {
-        #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-          HalLcdWriteString( "Connected Advertising",  HAL_LCD_LINE_3 );
-        #endif
-
-				#if (defined HAL_UART) && (HAL_UART == TRUE)
+        HalLcdWriteString( "Connected Advertising",  HAL_LCD_LINE_3 );
 				NPI_PrintString("Connected Advertising\r\n");
-				#endif
       }
       break;
 
     case GAPROLE_WAITING:
       {
-        #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-          HalLcdWriteString( "Disconnected",  HAL_LCD_LINE_3 );
-        #endif
-
-				#if (defined HAL_UART) && (HAL_UART == TRUE)
+				connected=false;
+				
+        HalLcdWriteString( "Disconnected",  HAL_LCD_LINE_3 );
 				NPI_PrintString("Disconnected\r\n");
-				#endif
 
 				#if (defined HAL_LED) && (HAL_LED == TRUE)
 					// Turn off LED that shows we're advertising
@@ -1317,13 +1338,8 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 
     case GAPROLE_WAITING_AFTER_TIMEOUT:
       {
-        #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-          HalLcdWriteString( "Timed Out",  HAL_LCD_LINE_3 );
-        #endif 
-
-				#if (defined HAL_UART) && (HAL_UART == TRUE)
+        HalLcdWriteString( "Timed Out",  HAL_LCD_LINE_3 );
 				NPI_PrintString("Timed Out\r\n");
-				#endif
 
 #ifdef PLUS_BROADCASTER
         // Reset flag for next connection.
@@ -1334,25 +1350,15 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 
     case GAPROLE_ERROR:
       {
-        #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-          HalLcdWriteString( "Error",  HAL_LCD_LINE_3 );
-        #endif
-
-				#if (defined HAL_UART) && (HAL_UART == TRUE)
+        HalLcdWriteString( "Error",  HAL_LCD_LINE_3 );
 				NPI_PrintString("Error\r\n");
-				#endif
       }
       break;
 
     default:
       {
-        #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-          HalLcdWriteString( "",  HAL_LCD_LINE_3 );
-        #endif
-
-				#if (defined HAL_UART) && (HAL_UART == TRUE)
+        HalLcdWriteString( "",  HAL_LCD_LINE_3 );
 				NPI_PrintString("unknow state!!\r\n");
-				#endif
       }
       break;
 
@@ -1437,15 +1443,13 @@ static void simpleProfileChangeCB( uint8 paramID )
       stat = SimpleProfile_GetParameter( SIMPLEPROFILE_CHAR1, &newValue );
 			if( stat == SUCCESS )
 			{
-	      #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-	        HalLcdWriteStringValue( "Char 1:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
-	      #endif
+	      HalLcdWriteStringValue( "Char 1:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
+				NPI_PrintValue("Char 1: ", (uint16)(newValue), 16);
+				NPI_PrintString("\r\n");
 			}
 			else
 			{
-				#if (HAL_UART == TRUE)
-					NPI_PrintString("Char 1: faild \r\n");
-				#endif
+				NPI_PrintString("Char 1: faild \r\n");
 			}
 
       break;
@@ -1454,49 +1458,36 @@ static void simpleProfileChangeCB( uint8 paramID )
       stat = SimpleProfile_GetParameter( SIMPLEPROFILE_CHAR3, &newValue );
 			if( stat == SUCCESS )
 			{
-	      #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-	        HalLcdWriteStringValue( "Char 3:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
-	      #endif
+	      HalLcdWriteStringValue( "Char 3:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
+				NPI_PrintValue("Char 3: ", (uint16)(newValue), 16);
+				NPI_PrintString("\r\n");
 			}
 			else
 			{
-				#if (HAL_UART == TRUE)
-					NPI_PrintString("Char 3: faild \r\n");
-				#endif
+				NPI_PrintString("Char 3: faild \r\n");
 			}
 
       break;
 
 		case SIMPLEPROFILE_NOTI_DISABLED:
-			#if (HAL_UART == TRUE)
-				NPI_PrintString("Char 4 notify disabled !\r\n");
-			#endif
+			NPI_PrintString("Char 4 notify disabled !\r\n");
 			break;
 
 		case SIMPLEPROFILE_NOTI_ENABLED:
-			#if (HAL_UART == TRUE)
-				NPI_PrintString("Char 4 notify enabled !\r\n");
-			#endif
+			NPI_PrintString("Char 4 notify enabled !\r\n");
 			break;
 
 		case SIMPLEPROFILE_INDI_DISABLED:
-			#if (HAL_UART == TRUE)
-				NPI_PrintString("Char 6 indicate disabled !\r\n");
-			#endif
-				break;
+			NPI_PrintString("Char 6 indicate disabled !\r\n");
+			break;
 
 		case SIMPLEPROFILE_INDI_ENABLED:
-			#if (HAL_UART == TRUE)
-				NPI_PrintString("Char 6 indicate enabled !\r\n");
-			#endif
-				break;
+			NPI_PrintString("Char 6 indicate enabled !\r\n");
+			break;
 
     default:
       // should not reach here!
-      #if (HAL_UART == TRUE)
-				NPI_PrintString("unknow Callback indicating\r\n");
-			#endif
-
+			NPI_PrintString("unknow Callback indicating\r\n");
       break;
   }
 }
@@ -1524,8 +1515,6 @@ static void simpleProfileSendIndicate(void)
 	}
 
 	status = SimpleProfile_Char6_Indicate(notify_Handle, p, 20, simpleBLEPeripheral_TaskID);
-
-	#if (defined HAL_UART) && (HAL_UART == TRUE)
 	if(status == SUCCESS)
 	{
 		NPI_PrintString("indicate is seccess to send!\r\n");
@@ -1534,7 +1523,6 @@ static void simpleProfileSendIndicate(void)
 	{
 		NPI_PrintString("indicate is fail to send!\r\n");
 	}
-	#endif
 }
 
 /*********************************************************************
@@ -1577,9 +1565,7 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
   {
     timeAppPairingStarted = TRUE;
 
-		#if (defined HAL_UART) && (HAL_UART== TRUE)
 		NPI_PrintString("Pairing started\r\n");
-		#endif
   }
   else if ( state == GAPBOND_PAIRING_STATE_COMPLETE )
   {
@@ -1587,9 +1573,7 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 
     if ( status == SUCCESS )
     {
-			#if (defined HAL_UART) && (HAL_UART== TRUE)
 			NPI_PrintString("Pairing success\r\n");
-			#endif
 
       linkDBItem_t  *pItem;
 
@@ -1613,19 +1597,15 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
     }
 		else
 		{
-		  #if (defined HAL_UART) && (HAL_UART== TRUE)
 			NPI_PrintValue(" Pairing fail ", status, 10);
 			NPI_PrintString("!!\r\n");
-			#endif
 		}
   }
 	else if ( state == GAPBOND_PAIRING_STATE_BONDED )
   {
     if ( status == SUCCESS )
     {
-			#if (defined HAL_UART) && (HAL_UART== TRUE)
 			NPI_PrintString("Bonding success\r\n");
-			#endif
     }
   }
 }
@@ -1710,13 +1690,13 @@ static void bpFinalMeas(void)
       *p++ = time.minutes;
       *p++ = time.seconds;
 
-			#if (defined HAL_UART) && (HAL_UART== TRUE)
-			NPI_PrintValue("bpFinalMeas year ", time.year, 10);
-			NPI_PrintValue(" month ", time.month, 10);
-			NPI_PrintValue(" day ", time.day, 10);
-			NPI_PrintValue(" hour ", time.hour, 10);
-			NPI_PrintValue(" minutes ", time.minutes, 10);
-			NPI_PrintValue(" seconds ", time.seconds, 10);
+			#if 0
+			NPI_PrintValue("", time.year, 10);
+			NPI_PrintValue("-", time.month, 10);
+			NPI_PrintValue("-", time.day, 10);
+			NPI_PrintValue(" ", time.hour, 10);
+			NPI_PrintValue(":", time.minutes, 10);
+			NPI_PrintValue(":", time.seconds, 10);
 			NPI_PrintString("\r\n");
 			#endif
     }
@@ -1760,15 +1740,13 @@ static void bpFinalMeas(void)
  */
 static void bpStoreIndications(attHandleValueInd_t *pInd)
 {
+	NPI_PrintValue("bpStoreIndications ", (uint16) pInd->pValue, 16);
+	NPI_PrintString("\r\n");
+
   attHandleValueInd_t *pStoreInd = &bpStoreMeas[bpStoreIndex];
 
   if (pStoreInd->pValue != NULL)
   {
-		#if (defined HAL_UART) && (HAL_UART== TRUE)
-		NPI_PrintValue("bpStoreIndications old ", (uint16) pStoreInd->pValue, 10);
-		NPI_PrintString("\r\n");
-		#endif
-
     // Free old indication's payload.
     GATT_bm_free((gattMsg_t *)pStoreInd, ATT_HANDLE_VALUE_IND);
   }
@@ -1803,12 +1781,6 @@ static void bpStoreIndications(attHandleValueInd_t *pInd)
  */
 static void bpSendStoredMeas(void)
 {
-	#if (defined HAL_UART) && (HAL_UART== TRUE)
-	NPI_PrintValue("bpSendStoredMeas StartIndex ", bpStoreStartIndex, 10);
-	NPI_PrintValue(" bpStoreIndex ", bpStoreIndex, 10);
-	NPI_PrintString("\r\n");
-	#endif
-
   // We connected to this peer before so send any stored measurements
   if (bpStoreStartIndex != bpStoreIndex)
   {
@@ -1832,15 +1804,13 @@ static void bpSendStoredMeas(void)
       // Clear out this Meas indication.
       VOID osal_memset( pStoreInd, 0, sizeof(attHandleValueInd_t) );
 
-			#if (defined HAL_UART) && (HAL_UART == TRUE)
-			NPI_PrintString("send bp indicate is seccess\r\n");
-			#endif
+			NPI_PrintValue("bpSendStoredMeas StartIndex", bpStoreStartIndex-1, 10);
+			NPI_PrintString("indicate is seccess\r\n");
     }
 		else
 		{
-			#if (defined HAL_UART) && (HAL_UART == TRUE)
-			NPI_PrintString("send bp indicate is failed\r\n");
-			#endif
+			NPI_PrintValue("bpSendStoredMeas StartIndex", bpStoreStartIndex, 10);
+			NPI_PrintString("indicate is failed\r\n");
 		}
   }
 }
@@ -1901,13 +1871,13 @@ static void cuffMeas(void)
       *p++ = time.minutes;
       *p++ = time.seconds;
 
-			#if (defined HAL_UART) && (HAL_UART== TRUE)
-			NPI_PrintValue("cuffMeas year ", time.year, 10);
-			NPI_PrintValue(" month ", time.month, 10);
-			NPI_PrintValue(" day ", time.day, 10);
-			NPI_PrintValue(" hour ", time.hour, 10);
-			NPI_PrintValue(" minutes ", time.minutes, 10);
-			NPI_PrintValue(" seconds ", time.seconds, 10);
+			#if 0
+			NPI_PrintValue(" ", time.year, 10);
+			NPI_PrintValue("-", time.month, 10);
+			NPI_PrintValue("-", time.day, 10);
+			NPI_PrintValue(" ", time.hour, 10);
+			NPI_PrintValue(":", time.minutes, 10);
+			NPI_PrintValue(":", time.seconds, 10);
 			NPI_PrintString("\r\n");
 			#endif
     }
@@ -1935,8 +1905,18 @@ static void cuffMeas(void)
     if ( BloodPressure_IMeasNotify( gapConnHandle, &bloodPressureIMeas,
                                     simpleBLEPeripheral_TaskID ) != SUCCESS )
     {
+			NPI_PrintValue("send", (uint16)bloodPressureIMeas.pValue, 16);		
+			NPI_PrintValue("len", (uint16)bloodPressureIMeas.len, 16);
+			NPI_PrintString("bp notify is failed\r\n");
+			
       GATT_bm_free( (gattMsg_t *)&bloodPressureIMeas, ATT_HANDLE_VALUE_NOTI );
     }
+		else
+		{
+			NPI_PrintValue("send", (uint16)bloodPressureIMeas.pValue, 16);		
+			NPI_PrintValue("len", (uint16)bloodPressureIMeas.len, 16);
+			NPI_PrintString("bp notify is seccess\r\n");
+		}
   }
 }
 
@@ -1980,7 +1960,6 @@ static void simulateMeas( void )
   }
 }
 
-#if (defined HAL_LCD) && (HAL_LCD == TRUE)
 /*********************************************************************
  * @fn      bdAddr2Str
  *
@@ -2012,7 +1991,6 @@ char *bdAddr2Str( uint8 *pAddr )
 
   return str;
 }
-#endif // (defined HAL_LCD) && (HAL_LCD == TRUE)
 
 /*********************************************************************
 *********************************************************************/
