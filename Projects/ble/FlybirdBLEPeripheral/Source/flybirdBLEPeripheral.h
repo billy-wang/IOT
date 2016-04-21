@@ -65,6 +65,8 @@ extern "C"
 #define SBP_CCC_UPDATE_EVT                             		0x0040
 #define SBP_DISCONNECT_EVT                             		0x0080
 
+#define	SMP_BOND_EVT																			0x0100
+
 /*********************************************************************
  * MACROS
  */

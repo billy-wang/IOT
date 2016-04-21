@@ -44,6 +44,7 @@
 #include "bcomdef.h"
 #include "OSAL.h"
 #include "OSAL_PwrMgr.h"
+#include "Osal_snv.h"
 
 #include "OnBoard.h"
 #include "hal_adc.h"
@@ -330,13 +331,28 @@ static uint8 bpStoreIndex = 0;
 
 static uint8 lastChar3Value = 0;
 
-static bool connected = false;
+// Structure of NV data for the connected device's address information
+typedef struct
+{
+  uint8   publicAddr[B_ADDR_LEN];     // Master's address
+  uint8   reconnectAddr[B_ADDR_LEN];  // Privacy Reconnection Address
+  uint16  stateFlags;                 // State flags: SM_AUTH_STATE_AUTHENTICATED & SM_AUTH_STATE_BONDING
+} BondRec_t;
+
+static uint8 gPairStatus=0;
+static uint8 PrivateStatus=0;
+
+// Local RAM shadowed bond records
+static BondRec_t BondRecords[10] = {0};
+static uint8 ConnectedWhiteListDevAddr[B_ADDR_LEN] = {0};
 
 /*********************************************************************
  * LOCAL FUNCTIONS
  */
 static void simpleBLEPeripheral_ProcessOSALMsg( osal_event_hdr_t *pMsg );
 static void simpleBLEPeripheral_ProcessGATTMsg( gattMsgEvent_t *pMsg );
+static void timeAppDisconnected( void );
+static void timeAppDiscpostponed( void );
 static void peripheralStateNotificationCB( gaprole_States_t newState );
 static void performPeriodicTask( void );
 static void simpleProfileChangeCB( uint8 paramID );
@@ -357,6 +373,11 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys );
 #endif
 
 static char *bdAddr2Str ( uint8 *pAddr );
+
+static void DevPrivateCheck( void );
+static uint8 StorePrivateBDadd(void);
+static uint8 BondFindAddr( uint8 *pDevAddr );
+static uint8 RWFlashTest( void );
 
 /*********************************************************************
  * PROFILE CALLBACKS
@@ -489,9 +510,9 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
   // Setup the GAP Bond Manager
   {
     uint32 passkey = 0; // passkey "000000"
-    uint8 pairMode = GAPBOND_PAIRING_MODE_WAIT_FOR_REQ;
-    uint8 mitm = FALSE;
-    uint8 ioCap = GAPBOND_IO_CAP_DISPLAY_ONLY;
+    uint8 pairMode = GAPBOND_PAIRING_MODE_WAIT_FOR_REQ; //GAPBOND_PAIRING_MODE_INITIATE; //GAPBOND_PAIRING_MODE_WAIT_FOR_REQ;
+    uint8 mitm = TRUE;
+    uint8 ioCap = GAPBOND_IO_CAP_NO_INPUT_NO_OUTPUT;	//GAPBOND_IO_CAP_DISPLAY_ONLY;
     uint8 bonding = TRUE;
     GAPBondMgr_SetParameter( GAPBOND_DEFAULT_PASSCODE, sizeof ( uint32 ), &passkey );
     GAPBondMgr_SetParameter( GAPBOND_PAIRING_MODE, sizeof ( uint8 ), &pairMode );
@@ -653,6 +674,16 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
     // return unprocessed events
     return (events ^ SYS_EVENT_MSG);
   }
+
+  ////////////////////////////////////////////////////////////////////
+  // 			START    		BOND    	 EVENT     	DONE
+  ////////////////////////////////////////////////////////////////////
+	if ( events & SMP_BOND_EVT )
+	{
+		DevPrivateCheck();
+
+		return ( events ^ SMP_BOND_EVT );
+	}
 
   ////////////////////////////////////////////////////////////////////
   // 			START    		DEVICE    	 EVENT     	DONE
@@ -873,6 +904,8 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
 
 		HalLcdWriteString( "JOY CENTER Press", HAL_LCD_LINE_3 );
 		NPI_PrintString( "JOY CENTER Press\r\n");
+
+		RWFlashTest();
   }
 
   if ( keys & HAL_KEY_LEFT )
@@ -1151,6 +1184,38 @@ static void timeAppDisconnected( void )
 }
 
 /*********************************************************************
+ * @fn      timeAppDiscpostponed
+ *
+ * @brief  discovery was postponed start discovery.
+ *
+ * @param  none
+ *
+ * @return  none
+ */
+static void timeAppDiscpostponed( void )
+{
+	linkDBItem_t	*pItem;
+
+	if ( (pItem = linkDB_Find( gapConnHandle )) != NULL )
+	{
+		// Store bonding state of pairing
+		timeAppBonded = ( (pItem->stateFlags & LINK_BOUND) == LINK_BOUND );
+
+		if ( timeAppBonded )
+		{
+			osal_memcpy( timeAppBondedAddr, pItem->addr, B_ADDR_LEN );
+		}
+	}
+
+	// If discovery was postponed start discovery
+	if ( timeAppDiscPostponed && timeAppDiscoveryCmpl == FALSE )
+	{
+		timeAppDiscPostponed = FALSE;
+		osal_set_event( simpleBLEPeripheral_TaskID, SBP_START_DISCOVERY_EVT );
+	}
+}
+
+/*********************************************************************
  * @fn      peripheralStateNotificationCB
  *
  * @brief   Notification from the profile of a state change.
@@ -1280,8 +1345,6 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 
 				}
 
-				connected=true;
-
 #ifdef PLUS_BROADCASTER
         // Only turn advertising on for this state when we first connect
         // otherwise, when we go from connected_advertising back to this state
@@ -1316,8 +1379,6 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 
     case GAPROLE_WAITING:
       {
-				connected=false;
-				
         HalLcdWriteString( "Disconnected",  HAL_LCD_LINE_3 );
 				NPI_PrintString("Disconnected\r\n");
 
@@ -1574,26 +1635,15 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
     if ( status == SUCCESS )
     {
 			NPI_PrintString("Pairing success\r\n");
-
-      linkDBItem_t  *pItem;
-
-      if ( (pItem = linkDB_Find( gapConnHandle )) != NULL )
-      {
-        // Store bonding state of pairing
-        timeAppBonded = ( (pItem->stateFlags & LINK_BOUND) == LINK_BOUND );
-
-        if ( timeAppBonded )
-        {
-          osal_memcpy( timeAppBondedAddr, pItem->addr, B_ADDR_LEN );
-        }
-      }
-
-      // If discovery was postponed start discovery
-      if ( timeAppDiscPostponed && timeAppDiscoveryCmpl == FALSE )
-      {
-        timeAppDiscPostponed = FALSE;
-        osal_set_event( simpleBLEPeripheral_TaskID, SBP_START_DISCOVERY_EVT );
-      }
+			if (gPairStatus )
+			{
+				osal_start_timerEx( simpleBLEPeripheral_TaskID, SMP_BOND_EVT, 50);
+				timeAppDiscpostponed();
+			}
+			else //if ( !gPairStatus )
+			{
+				StorePrivateBDadd();
+			}
     }
 		else
 		{
@@ -1606,6 +1656,10 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
     if ( status == SUCCESS )
     {
 			NPI_PrintString("Bonding success\r\n");
+			if (gPairStatus )
+			{
+				osal_start_timerEx( simpleBLEPeripheral_TaskID, SMP_BOND_EVT, 50);
+			}
     }
   }
 }
@@ -1805,12 +1859,12 @@ static void bpSendStoredMeas(void)
       VOID osal_memset( pStoreInd, 0, sizeof(attHandleValueInd_t) );
 
 			NPI_PrintValue("bpSendStoredMeas StartIndex", bpStoreStartIndex-1, 10);
-			NPI_PrintString("indicate is seccess\r\n");
+			NPI_PrintString(" indicate is seccess\r\n");
     }
 		else
 		{
 			NPI_PrintValue("bpSendStoredMeas StartIndex", bpStoreStartIndex, 10);
-			NPI_PrintString("indicate is failed\r\n");
+			NPI_PrintString(" indicate is failed\r\n");
 		}
   }
 }
@@ -1906,16 +1960,16 @@ static void cuffMeas(void)
                                     simpleBLEPeripheral_TaskID ) != SUCCESS )
     {
 			NPI_PrintValue("send", (uint16)bloodPressureIMeas.pValue, 16);		
-			NPI_PrintValue("len", (uint16)bloodPressureIMeas.len, 16);
-			NPI_PrintString("bp notify is failed\r\n");
+			NPI_PrintValue(" len", (uint16)bloodPressureIMeas.len, 16);
+			NPI_PrintString(" bp notify is failed\r\n");
 			
       GATT_bm_free( (gattMsg_t *)&bloodPressureIMeas, ATT_HANDLE_VALUE_NOTI );
     }
 		else
 		{
 			NPI_PrintValue("send", (uint16)bloodPressureIMeas.pValue, 16);		
-			NPI_PrintValue("len", (uint16)bloodPressureIMeas.len, 16);
-			NPI_PrintString("bp notify is seccess\r\n");
+			NPI_PrintValue(" len", (uint16)bloodPressureIMeas.len, 16);
+			NPI_PrintString(" bp notify is seccess\r\n");
 		}
   }
 }
@@ -1990,6 +2044,188 @@ char *bdAddr2Str( uint8 *pAddr )
   *pStr = 0;
 
   return str;
+}
+
+/*********************************************************************
+ * @fn      DevPrivateCheck
+ *
+ * @brief   Check the idot device is private.
+
+ * @param   None.
+ *
+ * @return  None.
+ */
+static void DevPrivateCheck( void )
+{
+	uint8 idx;													// NV Index
+	uint8 publicAddr[B_ADDR_LEN]				// Place to put the public address
+					= {0, 0, 0, 0, 0, 0};
+	uint8 ret;
+
+	uint8 bondAddr[B_ADDR_LEN]				// Place to put the public address
+					= {0, 0, 0, 0, 0, 0};
+
+	if (gPairStatus)
+	{
+		ret=GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, publicAddr);
+		if (ret == SUCCESS )
+		{
+			// Read in NV Main Bond Record and compare public address
+			ret=osal_snv_read( BLE_NVID_CUST_START, sizeof( bondAddr), bondAddr);
+			if (ret == SUCCESS )
+			{
+			  if ( osal_memcmp( bondAddr, publicAddr, B_ADDR_LEN ) )
+			  {
+						// TCL P728M 			E5:D1:B7:6D:E5:D8
+						// Lenovo X2-T0		2D:95:A6:8C:70:88
+			      // Found it
+			  }
+				else
+				{
+					GAPRole_TerminateConnection();
+				}
+			}
+			else
+			{
+				idx = BondFindAddr(publicAddr);
+				if ( idx == GAP_BONDINGS_MAX )
+				{
+					GAPRole_TerminateConnection();
+				}
+			}
+		}
+		else
+		{
+			NPI_PrintString("can't get bond addr from flash\r\n");
+		}
+	}
+}
+
+/*********************************************************************
+ * @fn      StorePrivateBDadd
+ *
+ * @brief   Check the idot device is private.
+
+ * @param   None.
+ *
+ * @return  None.
+ */
+static uint8 StorePrivateBDadd (void)
+{
+	uint8 ret;
+	uint8 pDevAddr[B_ADDR_LEN]= {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+
+	GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, pDevAddr);
+
+	osal_memcpy( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN );
+
+	ret=osal_snv_write( BLE_NVID_CUST_START, sizeof( pDevAddr), pDevAddr);
+	if ( ret == SUCCESS )
+	{
+		gPairStatus = true;
+		PrivateStatus = true;
+		return SUCCESS;
+	}
+	else
+	{
+		PrivateStatus = false;
+		return FAILURE;
+	}
+
+}
+
+/*********************************************************************
+ * @fn      BondFindAddr
+ *
+ * @brief   Look through the bonding entries to find an address.
+ *
+ * @param   pDevAddr - device address to look for
+ *
+ * @return  index to empty bonding (0 - (GAP_BONDINGS_MAX-1),
+ *          GAP_BONDINGS_MAX if no empty entries
+ */
+static uint8 BondFindAddr( uint8 *pDevAddr )
+{
+  // Item doesn't exist, so create all the items
+  for ( uint8 idx = 0; idx < GAP_BONDINGS_MAX; idx++ )
+  {
+    // Read in NV Main Bond Record and compare public address
+    if ( osal_memcmp( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN ) )
+    {
+			switch(pDevAddr[0])
+			{
+				case 0xE5 :
+					NPI_PrintString("Find TCL P728M\r\n");
+					break;
+				case 0x02 :
+					NPI_PrintString("Find Lenovo X2-T0\r\n");
+					break;
+				default :
+					NPI_PrintString("Find Unkown ble device\r\n");
+					break;
+			}
+      return ( idx ); // Found it
+    }
+  }
+
+  return ( GAP_BONDINGS_MAX );
+}
+
+/*********************************************************************
+ * @fn      RWFlashTest
+ *
+ * @brief   Start test read or write flash
+ *
+ * @return  None.
+ */
+static uint8 RWFlashTest( void )
+{
+	uint8 idx;
+	uint8 publicAddr[B_ADDR_LEN]				// Place to put the public address
+					= {0, 0, 0, 0, 0, 0};
+
+	uint8 pDevAddr[B_ADDR_LEN]= {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	//uint8 pDevAddr[B_ADDR_LEN]= {"1, 2, 3, 4, 5, 6"};
+	//uint8 pDevAddr[B_ADDR_LEN]= "123456";
+
+  HalLedSet( (HAL_LED_ALL), HAL_LED_MODE_ON );
+
+	osal_memcpy( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN );
+
+	idx=osal_snv_write( BLE_NVID_CUST_START,
+				sizeof( ConnectedWhiteListDevAddr), ConnectedWhiteListDevAddr);
+	if (idx == SUCCESS )
+	{
+		HalLedBlink ( HAL_LED_1, 1, 50, 1000);
+		NPI_PrintValue("Write BD [", (uint16)(ConnectedWhiteListDevAddr), 16);
+		NPI_PrintString(" ] to snv flash Success\r\n");
+
+		idx=osal_snv_read( BLE_NVID_CUST_START, sizeof( publicAddr), publicAddr);
+		if (idx == SUCCESS )
+		{
+			idx = BondFindAddr(publicAddr);
+			if ( idx < GAP_BONDINGS_MAX )
+			{
+				HalLedBlink ( HAL_LED_2, 1, 50, 1000);
+				return SUCCESS;
+			}
+		}
+		else
+		{
+			HalLedSet( HAL_LED_2 , HAL_LED_MODE_OFF );
+			NPI_PrintString("snv read failed\r\n");
+
+			return NV_OPER_FAILED;
+		}
+	}
+	else
+	{
+		NPI_PrintValue("Write BD [", (uint16)(ConnectedWhiteListDevAddr), 16);
+		NPI_PrintString(" ] to snv flash Failed\r\n");
+		HalLedSet( HAL_LED_1 , HAL_LED_MODE_OFF );
+
+		return NV_OPER_FAILED;
+	}
 }
 
 /*********************************************************************
