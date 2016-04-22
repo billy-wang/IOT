@@ -510,9 +510,9 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
   // Setup the GAP Bond Manager
   {
     uint32 passkey = 0; // passkey "000000"
-    uint8 pairMode = GAPBOND_PAIRING_MODE_WAIT_FOR_REQ; //GAPBOND_PAIRING_MODE_INITIATE; //GAPBOND_PAIRING_MODE_WAIT_FOR_REQ;
+    uint8 pairMode = GAPBOND_PAIRING_MODE_INITIATE; //GAPBOND_PAIRING_MODE_INITIATE; //GAPBOND_PAIRING_MODE_WAIT_FOR_REQ;
     uint8 mitm = TRUE;
-    uint8 ioCap = GAPBOND_IO_CAP_NO_INPUT_NO_OUTPUT;	//GAPBOND_IO_CAP_DISPLAY_ONLY;
+    uint8 ioCap = GAPBOND_IO_CAP_DISPLAY_ONLY;	//GAPBOND_IO_CAP_DISPLAY_ONLY;
     uint8 bonding = TRUE;
     GAPBondMgr_SetParameter( GAPBOND_DEFAULT_PASSCODE, sizeof ( uint32 ), &passkey );
     GAPBondMgr_SetParameter( GAPBOND_PAIRING_MODE, sizeof ( uint8 ), &pairMode );
@@ -651,8 +651,10 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
  */
 uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
 {
+#if 0
 	NPI_PrintValue("ProcessEvent ", events, 16);
 	NPI_PrintString("\r\n");
+#endif
 
   VOID task_id; // OSAL required parameter that isn't used in this function
 
@@ -967,11 +969,13 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
       //change the GAP advertisement status to opposite of current status
       GAPRole_SetParameter( GAPROLE_ADVERT_ENABLED, sizeof( uint8 ), &new_adv_enabled_status );
 
+#if 0
 			//start simulation timer (start --> cuff -->measurement ready)
       osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
 
       //reset cuff count
       cuffCount = 0;
+#endif
 
 #ifndef PLUS_BROADCASTER
     }
@@ -1204,6 +1208,9 @@ static void timeAppDiscpostponed( void )
 		if ( timeAppBonded )
 		{
 			osal_memcpy( timeAppBondedAddr, pItem->addr, B_ADDR_LEN );
+			NPI_PrintString("Found ");
+			NPI_WriteTransport(bdAddr2Str( timeAppBondedAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( timeAppBondedAddr )));
+			NPI_PrintString(" BondedAddr\r\n");
 		}
 	}
 
@@ -1622,46 +1629,71 @@ static void bpServiceCB(uint8 event)
  */
 static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 {
-  if ( state == GAPBOND_PAIRING_STATE_STARTED )
-  {
-    timeAppPairingStarted = TRUE;
+	NPI_PrintValue("PairState", state, 16);
+	NPI_PrintString("\r\n");
 
-		NPI_PrintString("Pairing started\r\n");
-  }
-  else if ( state == GAPBOND_PAIRING_STATE_COMPLETE )
-  {
-    timeAppPairingStarted = FALSE;
+	switch (state)
+	{
+		case GAPBOND_PAIRING_STATE_STARTED:
+			timeAppPairingStarted = TRUE;
 
-    if ( status == SUCCESS )
-    {
-			NPI_PrintString("Pairing success\r\n");
-			if (gPairStatus )
+			NPI_PrintString("Pairing started\r\n");
+			break;
+		case GAPBOND_PAIRING_STATE_COMPLETE:
+			timeAppPairingStarted = FALSE;
+			timeAppDiscPostponed = TRUE;
+			switch (status)
 			{
-				osal_start_timerEx( simpleBLEPeripheral_TaskID, SMP_BOND_EVT, 50);
-				timeAppDiscpostponed();
+				case SUCCESS :
+					NPI_PrintString("Pairing success\r\n");
+					if( StorePrivateBDadd() == SUCCESS )
+					{
+						osal_start_timerEx( simpleBLEPeripheral_TaskID, SMP_BOND_EVT, 50);
+					}
+					else
+					{
+						GAPRole_TerminateConnection();
+					}
+					break;
+				case SMP_PAIRING_FAILED_PASSKEY_ENTRY_FAILED	:	// 0x01
+				case SMP_PAIRING_FAILED_OOB_NOT_AVAIL					:	// 0x02
+				case SMP_PAIRING_FAILED_AUTH_REQ							:	// 0x03
+				case SMP_PAIRING_FAILED_CONFIRM_VALUE					:	// 0x04
+				case SMP_PAIRING_FAILED_NOT_SUPPORTED					:	// 0x05
+				case SMP_PAIRING_FAILED_ENC_KEY_SIZE					:	// 0x06
+				case SMP_PAIRING_FAILED_CMD_NOT_SUPPORTED			:	// 0x07
+				case SMP_PAIRING_FAILED_UNSPECIFIED						:	// 0x08
+				case SMP_PAIRING_FAILED_REPEATED_ATTEMPTS			:	// 0x09
+				default :
+					NPI_PrintValue(" Pairing fail ", status, 10);
+					NPI_PrintString("!!\r\n");
+					GAPRole_TerminateConnection();
+					break;
 			}
-			else //if ( !gPairStatus )
+			break;
+		case GAPBOND_PAIRING_STATE_BONDED :
+			switch (status)
 			{
-				StorePrivateBDadd();
+				case SUCCESS :
+					NPI_PrintString("Bonding success\r\n");
+					osal_start_timerEx( simpleBLEPeripheral_TaskID, SMP_BOND_EVT, 50);
+					break;
+				default :
+					NPI_PrintValue("Bonding fail ", status, 10);
+					NPI_PrintString("!!\r\n");
+					GAPRole_TerminateConnection();
+					break;
 			}
-    }
-		else
-		{
-			NPI_PrintValue(" Pairing fail ", status, 10);
-			NPI_PrintString("!!\r\n");
-		}
-  }
-	else if ( state == GAPBOND_PAIRING_STATE_BONDED )
-  {
-    if ( status == SUCCESS )
-    {
-			NPI_PrintString("Bonding success\r\n");
-			if (gPairStatus )
-			{
-				osal_start_timerEx( simpleBLEPeripheral_TaskID, SMP_BOND_EVT, 50);
-			}
-    }
-  }
+		case GAPBOND_PAIRING_STATE_BOND_SAVED :
+			NPI_PrintString("Bonding record saved in NV\r\n");
+			timeAppDiscpostponed();
+			break;
+		default:
+			NPI_PrintValue("Unknow state ", status, 10);
+			NPI_PrintString("\r\n");
+			GAPRole_TerminateConnection();
+			break;
+	}
 }
 
 /*********************************************************************
@@ -2065,46 +2097,52 @@ static void DevPrivateCheck( void )
 	uint8 bondAddr[B_ADDR_LEN]				// Place to put the public address
 					= {0, 0, 0, 0, 0, 0};
 
-	if (gPairStatus)
+	ret=GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, publicAddr);
+	if (ret == SUCCESS )
 	{
-		ret=GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, publicAddr);
+		// Read in NV Main Bond Record and compare public address
+		ret=osal_snv_read( BLE_NVID_CUST_START, sizeof( bondAddr), bondAddr);
 		if (ret == SUCCESS )
 		{
-			// Read in NV Main Bond Record and compare public address
-			ret=osal_snv_read( BLE_NVID_CUST_START, sizeof( bondAddr), bondAddr);
-			if (ret == SUCCESS )
+			if ( osal_memcmp( bondAddr, publicAddr, B_ADDR_LEN ) )
 			{
-			  if ( osal_memcmp( bondAddr, publicAddr, B_ADDR_LEN ) )
-			  {
-						// TCL P728M 			E5:D1:B7:6D:E5:D8
-						// Lenovo X2-T0		2D:95:A6:8C:70:88
-			      // Found it
-			  }
-				else
-				{
-					GAPRole_TerminateConnection();
-				}
+					// TCL P728M 			E5:D1:B7:6D:E5:D8
+					// Lenovo X2-T0		2D:95:A6:8C:70:88
+					// Found it
+					NPI_PrintString("Found ");
+					NPI_WriteTransport(bdAddr2Str( bondAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( bondAddr )));
+					NPI_PrintString(" central device\r\n");
+
+					//start simulation timer (start --> cuff -->measurement ready)
+					osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
+
+					//reset cuff count
+					cuffCount = 0;
 			}
 			else
 			{
-				idx = BondFindAddr(publicAddr);
-				if ( idx == GAP_BONDINGS_MAX )
-				{
-					GAPRole_TerminateConnection();
-				}
+				GAPRole_TerminateConnection();
 			}
 		}
 		else
 		{
-			NPI_PrintString("can't get bond addr from flash\r\n");
+			idx = BondFindAddr(publicAddr);
+			if ( idx == GAP_BONDINGS_MAX )
+			{
+				GAPRole_TerminateConnection();
+			}
 		}
+	}
+	else
+	{
+		NPI_PrintString("can't get bond addr from flash\r\n");
 	}
 }
 
 /*********************************************************************
  * @fn      StorePrivateBDadd
  *
- * @brief   Check the idot device is private.
+ * @brief   Check the device is private.
 
  * @param   None.
  *
@@ -2117,11 +2155,10 @@ static uint8 StorePrivateBDadd (void)
 
 	GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, pDevAddr);
 
-	osal_memcpy( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN );
-
 	ret=osal_snv_write( BLE_NVID_CUST_START, sizeof( pDevAddr), pDevAddr);
 	if ( ret == SUCCESS )
 	{
+		osal_memcpy( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN );
 		gPairStatus = true;
 		PrivateStatus = true;
 		return SUCCESS;
