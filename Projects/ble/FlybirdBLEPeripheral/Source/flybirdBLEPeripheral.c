@@ -344,7 +344,7 @@ static uint8 PrivateStatus=0;
 
 // Local RAM shadowed bond records
 static BondRec_t BondRecords[10] = {0};
-static uint8 ConnectedWhiteListDevAddr[B_ADDR_LEN] = {0};
+static uint8 ConnectedWhiteListDevAddr[B_ADDR_LEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 /*********************************************************************
  * LOCAL FUNCTIONS
@@ -2153,22 +2153,34 @@ static uint8 StorePrivateBDadd (void)
 	uint8 ret;
 	uint8 pDevAddr[B_ADDR_LEN]= {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-	GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, pDevAddr);
-
-	ret=osal_snv_write( BLE_NVID_CUST_START, sizeof( pDevAddr), pDevAddr);
+	ret=osal_snv_read( BLE_NVID_CUST_START, sizeof( ConnectedWhiteListDevAddr), ConnectedWhiteListDevAddr);
 	if ( ret == SUCCESS )
 	{
-		osal_memcpy( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN );
-		gPairStatus = true;
-		PrivateStatus = true;
-		return SUCCESS;
-	}
-	else
-	{
-		PrivateStatus = false;
-		return FAILURE;
-	}
+		NPI_WriteTransport(bdAddr2Str( ConnectedWhiteListDevAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( ConnectedWhiteListDevAddr )));
+		NPI_PrintString(" ] whielistdevadd\r\n");
 
+		if(osal_memcmp( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN )) // first bond 
+		{
+			GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, pDevAddr);
+			ret=osal_snv_write( BLE_NVID_CUST_START, sizeof( pDevAddr), pDevAddr);
+			if ( ret == SUCCESS )
+			{
+				osal_memcpy( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN );
+				gPairStatus = true;
+				PrivateStatus = true;
+				return SUCCESS;
+			}
+			else
+			{
+				PrivateStatus = false;
+				return FAILURE;
+			}
+		}
+		else
+		{
+			GAPRole_TerminateConnection();
+		}
+	}
 }
 
 /*********************************************************************
@@ -2234,7 +2246,8 @@ static uint8 RWFlashTest( void )
 	if (idx == SUCCESS )
 	{
 		HalLedBlink ( HAL_LED_1, 1, 50, 1000);
-		NPI_PrintValue("Write BD [", (uint16)(ConnectedWhiteListDevAddr), 16);
+		NPI_PrintString("Write BD [");
+		NPI_WriteTransport(bdAddr2Str( ConnectedWhiteListDevAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( ConnectedWhiteListDevAddr )));
 		NPI_PrintString(" ] to snv flash Success\r\n");
 
 		idx=osal_snv_read( BLE_NVID_CUST_START, sizeof( publicAddr), publicAddr);
