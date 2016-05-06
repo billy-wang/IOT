@@ -224,6 +224,33 @@ uint16 NPI_GetMaxTxBufSize( void )
   return( NPI_UART_TX_BUF_SIZE );
 }
 
+/*******************************************************************************
+ * @fn 			 NPI_SerialDelay
+ *
+ * @brief			 This routine delay serial uart.
+ *
+ * input parameters
+ *
+ * @param       times - delay times.
+ *
+ * output parameters
+ *
+ * @param       None.
+ *
+ * @return		 None.
+ *
+ */
+void NPI_SerialDelay(int times)
+{
+  while(times--)
+  {
+      int i=0;
+      for(i=6000;i>0;i--)
+      {
+				asm("nop");
+      }
+  }
+}
 
 /*******************************************************************************
  * @fn 			 NPI_PrintString
@@ -245,6 +272,7 @@ void NPI_PrintString(uint8 *buf)
 {
 #if (HAL_UART== TRUE)
 	NPI_WriteTransport(buf, osal_strlen((char*)buf));
+	NPI_SerialDelay(10);
 #endif
 }
 
@@ -283,6 +311,30 @@ void NPI_PrintValue(char *title, uint16 value, uint8 format)
 #endif
 }
 
+/*******************************************************************************
+ * @fn 			 NPI_Printf
+ *
+ * @brief			 This routine print the format of the specified value.
+ *
+ * input parameters
+ *
+ * @param       fmt 	  -  print the prefix string.
+ *
+ * output parameters
+ *
+ * @param       None.
+ *
+ * @return		 None.
+ *
+ */
+char sprint_buf[32];
+void NPI_Printf(char *fmt, ...)
+{
+#if (HAL_UART== TRUE)
+	sprintf(sprint_buf, fmt);
+	NPI_PrintString((uint8*)sprint_buf);
+#endif
+}
 
 /*******************************************************************************
  ******************************************************************************/

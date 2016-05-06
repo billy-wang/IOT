@@ -68,7 +68,7 @@ extern "C"
 #if !defined NPI_UART_PORT
 
 #if ((defined HAL_UART_SPI) && (HAL_UART_SPI != 0)) // FOR SPI
-#if (HAL_UART_SPI == 2)  
+#if (HAL_UART_SPI == 2)
 #define NPI_UART_PORT                  HAL_UART_PORT_1
 #else
 #define NPI_UART_PORT                  HAL_UART_PORT_0
@@ -81,7 +81,7 @@ extern "C"
 #else
 #define NPI_UART_PORT                  HAL_UART_PORT_0
 #endif
-#endif // Endif for HAL_UART_SPI/DMA 
+#endif // Endif for HAL_UART_SPI/DMA
 #endif //Endif for NPI_UART_PORT
 
 #if !defined( NPI_UART_FC )
@@ -128,6 +128,7 @@ extern uint16 NPI_GetMaxRxBufSize( void );
 extern uint16 NPI_GetMaxTxBufSize( void );
 extern void NPI_PrintString(uint8 *buf);
 extern void NPI_PrintValue(char *title, uint16 value, uint8 format);
+extern void NPI_Printf(char *fmt, ...);
 
 /*******************************************************************************
 */

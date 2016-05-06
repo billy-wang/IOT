@@ -1,12 +1,12 @@
-/**************************************************************************************************
-  Filename:       simpleBLEperipheral.h
-  Revised:        $Date: 2010-08-01 14:03:16 -0700 (Sun, 01 Aug 2010) $
-  Revision:       $Revision: 23256 $
+/*******************************************************************************
+  Filename:       wechat_util.h
+  Revised:        $Date: 2016-04-26 10:36:34 -0700 (Mon, 26 Apr 2016) $
+  Revision:       $Revision: 1.0.4 $
 
-  Description:    This file contains the Simple BLE Peripheral sample application
-                  definitions and prototypes.
+  Description:    This file contains the BloodPressure service definitions and
+                  prototypes.
 
-  Copyright 2010 - 2011 Texas Instruments Incorporated. All rights reserved.
+ Copyright 2011 - 2013 Texas Instruments Incorporated. All rights reserved.
 
   IMPORTANT: Your use of this Software is limited to those specific rights
   granted under the terms of a software license agreement between the user
@@ -35,10 +35,10 @@
 
   Should you have any questions regarding your right to use this Software,
   contact Texas Instruments Incorporated at www.TI.com.
-**************************************************************************************************/
+*******************************************************************************/
 
-#ifndef SIMPLEBLEPERIPHERAL_H
-#define SIMPLEBLEPERIPHERAL_H
+#ifndef WECHAT_UTIL_H
+#define WECHAT_UTIL_H
 
 #ifdef __cplusplus
 extern "C"
@@ -52,66 +52,44 @@ extern "C"
 /*********************************************************************
  * CONSTANTS
  */
-//#define SUPPORTSIMPLEPROFILE
 
-//#define SUPPORTBLOODPRESSURE
+/*********************************************************************
+ * TYPEDEFS
+ */
 
-//#define SUPPORTWECHAT
-
-// Simple BLE Peripheral Task Events
-#define SBP_START_DEVICE_EVT                              0x0001
-#define SBP_PERIODIC_EVT                                  0x0002
-#define SBP_POWERON_LED_TIMEOUT_EVT												0x0004
-
-#define SBP_TIMER_BPMEAS_EVT                              0x0008
-#define SBP_START_DISCOVERY_EVT														0x0010
-#define SBP_TIMER_CUFF_EVT                             		0x0020
-#define SBP_CCC_UPDATE_EVT                             		0x0040
-#define SBP_DISCONNECT_EVT                             		0x0080
-
-#define	SMP_BOND_EVT																			0x0100
-#define	WECHAT_CCC_UPDATE_EVT															0x0200
-#define	WECHAT_WRITE_EVT																	0x0400
-
+// Wechat Service callback function
+//typedef void (*wechatServiceCB_t)(uint8 event);
 
 
 /*********************************************************************
  * MACROS
  */
- 
-// LCD macros
-#if HAL_LCD == TRUE
-#define LCD_WRITE_STRING(str, option)                       HalLcdWriteString( (str), (option))
-#define LCD_WRITE_SCREEN(line1, line2)                      HalLcdWriteScreen( (line1), (line2) )
-#define LCD_WRITE_STRING_VALUE(title, value, format, line)  HalLcdWriteStringValue( (title), (value), (format), (line) )
-#else
-#define LCD_WRITE_STRING(str, option)                     
-#define LCD_WRITE_SCREEN(line1, line2)                    
-#define LCD_WRITE_STRING_VALUE(title, value, format, line)
-#endif
 
 /*********************************************************************
- * FUNCTIONS
+ * Profile Callbacks
+ */
+
+/*********************************************************************
+ * API FUNCTIONS 
  */
 
 /*
- * Task Initialization for the BLE Application
+ * @fn      Wechat_AddService
+ *
+ * @brief   Initializes the Wecaht service by registering
+ *          GATT attributes with the GATT server.
+ *
+ * @param   services - services to add. This is a bit map and can
+ *                     contain more than one service.
+ *
+ * @return  Success or Failure
  */
-extern void SimpleBLEPeripheral_Init( uint8 task_id );
+//extern bStatus_t Wechat_AddService(uint32 services);
 
-/*
- * Task Event Processor for the BLE Application
- */
-extern uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events );
-
-
-extern uint8 Wechat_Init( void );
-
-extern void Wechat_main_process(void);
-
-extern void Wechat_on_write(uint8 *pValue, uint8 len, uint16 offset);
-
-extern uint8 Wechat_device_test_senddat(void);
+unsigned short htons(unsigned short val);
+unsigned short ntohs(unsigned short val);
+unsigned long t_htonl(unsigned long h);
+unsigned long t_ntohl(unsigned long n);
 
 
 /*********************************************************************
@@ -121,4 +99,5 @@ extern uint8 Wechat_device_test_senddat(void);
 }
 #endif
 
-#endif /* SIMPLEBLEPERIPHERAL_H */
+#endif /* WECHAT_UTIL_H */
+

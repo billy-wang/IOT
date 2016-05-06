@@ -81,6 +81,10 @@
 #include "bpservice.h"
 #include "timeapp.h"
 #include "OSAL_Clock.h"
+#include "epb_MmBp.h"
+#include "wechatservice.h"
+#include "wechatapp.h"
+
 
 /*********************************************************************
  * MACROS
@@ -152,7 +156,7 @@
 
 #define BP_DISCONNECT_PERIOD                  6000
 
-#define CUFF_MAX                              40
+#define CUFF_MAX                              5//40
 
 #define TIMER_CUFF_PERIOD                     500
 
@@ -257,11 +261,17 @@ static uint8 advertData[] =
 
   // service UUID, to notify central devices what services are included
   // in this peripheral
-  0x03,   // length of this data
+  0x05,   // length of this data
   GAP_ADTYPE_16BIT_MORE,      // some of the UUID's, but not all
   LO_UINT16( SIMPLEPROFILE_SERV_UUID ),
   HI_UINT16( SIMPLEPROFILE_SERV_UUID ),
+	LO_UINT16( WECHAT_SERV_UUID ),
+	HI_UINT16( WECHAT_SERV_UUID ),
 
+	//self data
+	0x11,
+	GAP_ADTYPE_MANUFACTURER_SPECIFIC,
+	0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0xbc,0x6a,0x29,0xac,0x1d,0x3f
 };
 
 // GAP GATT Attributes
@@ -362,17 +372,19 @@ static void bpServiceCB(uint8 event);
 static void timeAppPasscodeCB( uint8 *deviceAddr, uint16 connectionHandle,
 																						uint8 uiInputs, uint8 uiOutputs );
 static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status );
+static void wechatServiceCB(uint8 event, uint8 *pValue, uint8 len, uint16 offset);
 static void bpFinalMeas(void);
 static void bpStoreIndications(attHandleValueInd_t* pInd);
 static void bpSendStoredMeas();
 static void cuffMeas(void);
 static void simulateMeas( void );
+void Snv_Delay(int times);
 
 #if (defined HAL_KEY) && (HAL_KEY == TRUE)
 static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys );
 #endif
 
-static char *bdAddr2Str ( uint8 *pAddr );
+char *bdAddr2Str ( uint8 *pAddr );
 
 static void DevPrivateCheck( void );
 static uint8 StorePrivateBDadd(void);
@@ -512,7 +524,7 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
     uint32 passkey = 0; // passkey "000000"
     uint8 pairMode = GAPBOND_PAIRING_MODE_INITIATE; //GAPBOND_PAIRING_MODE_INITIATE; //GAPBOND_PAIRING_MODE_WAIT_FOR_REQ;
     uint8 mitm = TRUE;
-    uint8 ioCap = GAPBOND_IO_CAP_DISPLAY_ONLY;	//GAPBOND_IO_CAP_DISPLAY_ONLY;
+    uint8 ioCap = GAPBOND_IO_CAP_NO_INPUT_NO_OUTPUT; //GAPBOND_IO_CAP_NO_INPUT_NO_OUTPUT; //GAPBOND_IO_CAP_DISPLAY_ONLY;
     uint8 bonding = TRUE;
     GAPBondMgr_SetParameter( GAPBOND_DEFAULT_PASSCODE, sizeof ( uint32 ), &passkey );
     GAPBondMgr_SetParameter( GAPBOND_PAIRING_MODE, sizeof ( uint8 ), &pairMode );
@@ -542,6 +554,8 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
   DevInfo_AddService();                           // Device Information Service
   SimpleProfile_AddService( GATT_ALL_SERVICES );  // Simple GATT Profile
   BloodPressure_AddService( GATT_ALL_SERVICES );
+  Wechat_AddService( GATT_ALL_SERVICES );
+  Wechat_Register( wechatServiceCB );
 #if defined FEATURE_OAD
   VOID OADTarget_AddService();                    // OAD Profile
 #endif
@@ -634,6 +648,8 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
 	NPI_PrintString("\r\n");
 #endif
 
+	Wechat_Init();
+
 }
 
 /*********************************************************************
@@ -651,7 +667,7 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
  */
 uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
 {
-#if 0
+#if 1
 	NPI_PrintValue("ProcessEvent ", events, 16);
 	NPI_PrintString("\r\n");
 #endif
@@ -811,6 +827,34 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
 
     return (events ^ SBP_CCC_UPDATE_EVT);
   }
+	
+  ////////////////////////////////////////////////////////////////////
+  //			 Enable 	Wechat 		CCC     AUTH
+  ////////////////////////////////////////////////////////////////////
+  if ( events & WECHAT_CCC_UPDATE_EVT )
+  {
+    if (gapProfileState == GAPROLE_CONNECTED)
+    {
+        //Wechat_device_auth();//send stored auth data
+        Wechat_main_process();
+    }
+
+    return (events ^ WECHAT_CCC_UPDATE_EVT);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  //			 Wechat 			AUTH
+  ////////////////////////////////////////////////////////////////////
+  if ( events & WECHAT_WRITE_EVT )
+  {
+    if (gapProfileState == GAPROLE_CONNECTED)
+    {
+        //Wechat_device_init();//send stored measurements
+        Wechat_main_process();
+    }
+
+    return (events ^ WECHAT_WRITE_EVT);
+  }
 
 	////////////////////////////////////////////////////////////////////
   // 	Disconnect 		after 		sending 		measurement
@@ -926,6 +970,8 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
 
 		HalLcdWriteString( "JOY DOWN Press", HAL_LCD_LINE_3 );
 		NPI_PrintString( "JOY DOWN Press\r\n");
+
+		Wechat_device_test_senddat();
   }
 
   if ( keys & HAL_KEY_SW_7 )
@@ -1209,7 +1255,7 @@ static void timeAppDiscpostponed( void )
 		{
 			osal_memcpy( timeAppBondedAddr, pItem->addr, B_ADDR_LEN );
 			NPI_PrintString("Found ");
-			NPI_WriteTransport(bdAddr2Str( timeAppBondedAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( timeAppBondedAddr )));
+			NPI_WriteTransport((uint8*)bdAddr2Str( timeAppBondedAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( timeAppBondedAddr )));
 			NPI_PrintString(" BondedAddr\r\n");
 		}
 	}
@@ -1267,6 +1313,7 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 				HalLcdWriteString( bdAddr2Str( ownAddress ),  HAL_LCD_LINE_2 );
 				HalLcdWriteString( "Initialized",  HAL_LCD_LINE_3 );
 				NPI_PrintString("Initialized\r\n");
+				NPI_Printf("bdaddr %s \r\n", bdAddr2Str( ownAddress ));
       }
       break;
 
@@ -1439,7 +1486,7 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 		 timeAppDisconnected();
 
 		 //always stop intermediate timer
-		 osal_stop_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT );
+		 //osal_stop_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT );
 
 		 // stop disconnect timer
 		 osal_stop_timerEx( simpleBLEPeripheral_TaskID, BP_DISCONNECT_PERIOD );
@@ -1511,6 +1558,14 @@ static void simpleProfileChangeCB( uint8 paramID )
       stat = SimpleProfile_GetParameter( SIMPLEPROFILE_CHAR1, &newValue );
 			if( stat == SUCCESS )
 			{
+				switch( newValue & 0xFFFF )
+				{
+					case 0xff :
+						RWFlashTest();
+						break;
+					default:
+						break;
+				}
 	      HalLcdWriteStringValue( "Char 1:", (uint16)(newValue), 10,  HAL_LCD_LINE_3 );
 				NPI_PrintValue("Char 1: ", (uint16)(newValue), 16);
 				NPI_PrintString("\r\n");
@@ -1629,8 +1684,8 @@ static void bpServiceCB(uint8 event)
  */
 static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 {
-	NPI_PrintValue("PairState", state, 16);
-	NPI_PrintString("\r\n");
+	//NPI_PrintValue("PairState", state, 16);
+	//NPI_PrintString("\r\n");
 
 	switch (state)
 	{
@@ -1639,6 +1694,7 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 
 			NPI_PrintString("Pairing started\r\n");
 			break;
+			
 		case GAPBOND_PAIRING_STATE_COMPLETE:
 			timeAppPairingStarted = FALSE;
 			timeAppDiscPostponed = TRUE;
@@ -1649,10 +1705,6 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 					if( StorePrivateBDadd() == SUCCESS )
 					{
 						osal_start_timerEx( simpleBLEPeripheral_TaskID, SMP_BOND_EVT, 50);
-					}
-					else
-					{
-						GAPRole_TerminateConnection();
 					}
 					break;
 				case SMP_PAIRING_FAILED_PASSKEY_ENTRY_FAILED	:	// 0x01
@@ -1671,6 +1723,7 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 					break;
 			}
 			break;
+			
 		case GAPBOND_PAIRING_STATE_BONDED :
 			switch (status)
 			{
@@ -1684,10 +1737,12 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 					GAPRole_TerminateConnection();
 					break;
 			}
+			
 		case GAPBOND_PAIRING_STATE_BOND_SAVED :
 			NPI_PrintString("Bonding record saved in NV\r\n");
 			timeAppDiscpostponed();
 			break;
+			
 		default:
 			NPI_PrintValue("Unknow state ", status, 10);
 			NPI_PrintString("\r\n");
@@ -1706,25 +1761,76 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 static void timeAppPasscodeCB( uint8 *deviceAddr, uint16 connectionHandle,
                                         uint8 uiInputs, uint8 uiOutputs )
 {
-	#if (defined HAL_UART) && (HAL_UART== TRUE)
-  uint32  passcode;
-  uint8   str[7];
+	uint8 ioCap;
 
-  // Create random passcode
-  LL_Rand( ((uint8 *) &passcode), sizeof( uint32 ));
-  passcode %= 1000000;
+	GAPBondMgr_GetParameter(GAPBOND_IO_CAPABILITIES, &ioCap);
 
-  // Display passcode to user
-  if ( uiOutputs != 0 )
+	if (ioCap == GAPBOND_IO_CAP_NO_INPUT_NO_OUTPUT )
+	{
+		GAPBondMgr_PasscodeRsp( connectionHandle, SUCCESS, 0 );
+	}
+	else
+	{
+		uint32	passcode;
+		#if (defined HAL_UART) && (HAL_UART== TRUE)
+	  uint8   str[7];
+
+	  // Create random passcode
+	  LL_Rand( ((uint8 *) &passcode), sizeof( uint32 ));
+	  passcode %= 1000000;
+
+	  // Display passcode to user
+	  if ( uiOutputs != 0 )
+	  {
+			NPI_PrintString("Passcode:\r\n");
+			NPI_PrintString( (uint8 *) _ltoa(passcode, str, 10));
+			NPI_PrintString("\r\n");
+	  }
+		#endif
+
+	  // Send passcode response
+	  GAPBondMgr_PasscodeRsp( connectionHandle, SUCCESS, passcode );
+	}
+}
+
+/*********************************************************************
+ * @fn      Wechat Service Callback
+ *
+ * @brief   Callback function for wechat service.
+ *
+ * @param   event - service event
+ *
+ *   Need to know if wechat  enabled so we can send stored meas. 
+ *
+ *    #define WECHAT_INDICATE_ENABLED         1
+ *    #define WECHAT_INDICATE_DISABLED        2
+ *
+ * @return  none
+ */
+static void wechatServiceCB(uint8 event, uint8 *pValue, uint8 len, uint16 offset)
+{
+  switch (event)
   {
-		NPI_PrintString("Passcode:\r\n");
-		NPI_PrintString( (uint8 *) _ltoa(passcode, str, 10));
-		NPI_PrintString("\r\n");
-  }
-	#endif
+    case WECHAT_INDICATE_ENABLED :
+  		wechatSta.indication_state = true;
+      osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT );
+      break;
+		case WECHAT_INDICATE_DISABLED :
+			NPI_Printf("wechat indication disable!\r\n");
+			wechatSta.indication_state = false;
+			break;
 
-  // Send passcode response
-  GAPBondMgr_PasscodeRsp( connectionHandle, SUCCESS, 0 );
+		case WECHAT_ON_WRITE :
+			if (gapProfileState == GAPROLE_CONNECTED)
+			{
+				Wechat_on_write(pValue, len, offset);
+			}
+			osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_WRITE_EVT );
+			break;
+
+    default:
+      break;
+  }
 }
 
 /*********************************************************************
@@ -2100,6 +2206,8 @@ static void DevPrivateCheck( void )
 	ret=GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, publicAddr);
 	if (ret == SUCCESS )
 	{
+		Snv_Delay(3);
+		
 		// Read in NV Main Bond Record and compare public address
 		ret=osal_snv_read( BLE_NVID_CUST_START, sizeof( bondAddr), bondAddr);
 		if (ret == SUCCESS )
@@ -2110,17 +2218,18 @@ static void DevPrivateCheck( void )
 					// Lenovo X2-T0		2D:95:A6:8C:70:88
 					// Found it
 					NPI_PrintString("Found ");
-					NPI_WriteTransport(bdAddr2Str( bondAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( bondAddr )));
+					NPI_WriteTransport((uint8*)bdAddr2Str( bondAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( bondAddr )));
 					NPI_PrintString(" central device\r\n");
 
 					//start simulation timer (start --> cuff -->measurement ready)
-					osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
+					//osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
 
 					//reset cuff count
-					cuffCount = 0;
+					//cuffCount = 0;
 			}
 			else
 			{
+				NPI_PrintString("This device is bonded!!\r\n");
 				GAPRole_TerminateConnection();
 			}
 		}
@@ -2129,6 +2238,7 @@ static void DevPrivateCheck( void )
 			idx = BondFindAddr(publicAddr);
 			if ( idx == GAP_BONDINGS_MAX )
 			{
+				NPI_PrintString("bond max !!\r\n");
 				GAPRole_TerminateConnection();
 			}
 		}
@@ -2153,15 +2263,18 @@ static uint8 StorePrivateBDadd (void)
 	uint8 ret;
 	uint8 pDevAddr[B_ADDR_LEN]= {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
+	Snv_Delay(3);
+
 	ret=osal_snv_read( BLE_NVID_CUST_START, sizeof( ConnectedWhiteListDevAddr), ConnectedWhiteListDevAddr);
 	if ( ret == SUCCESS )
 	{
-		NPI_WriteTransport(bdAddr2Str( ConnectedWhiteListDevAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( ConnectedWhiteListDevAddr )));
+		NPI_WriteTransport((uint8*)bdAddr2Str( ConnectedWhiteListDevAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( ConnectedWhiteListDevAddr )));
 		NPI_PrintString(" ] whielistdevadd\r\n");
 
 		if(osal_memcmp( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN )) // first bond 
 		{
 			GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, pDevAddr);
+			Snv_Delay(3);
 			ret=osal_snv_write( BLE_NVID_CUST_START, sizeof( pDevAddr), pDevAddr);
 			if ( ret == SUCCESS )
 			{
@@ -2178,6 +2291,7 @@ static uint8 StorePrivateBDadd (void)
 		}
 		else
 		{
+			NPI_PrintString("snv read failed\r\n");
 			GAPRole_TerminateConnection();
 		}
 	}
@@ -2247,8 +2361,10 @@ static uint8 RWFlashTest( void )
 	{
 		HalLedBlink ( HAL_LED_1, 1, 50, 1000);
 		NPI_PrintString("Write BD [");
-		NPI_WriteTransport(bdAddr2Str( ConnectedWhiteListDevAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( ConnectedWhiteListDevAddr )));
+		NPI_WriteTransport((uint8*)bdAddr2Str( ConnectedWhiteListDevAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( ConnectedWhiteListDevAddr )));
 		NPI_PrintString(" ] to snv flash Success\r\n");
+
+		Snv_Delay(3);
 
 		idx=osal_snv_read( BLE_NVID_CUST_START, sizeof( publicAddr), publicAddr);
 		if (idx == SUCCESS )
@@ -2276,6 +2392,34 @@ static uint8 RWFlashTest( void )
 
 		return NV_OPER_FAILED;
 	}
+}
+
+/*******************************************************************************
+ * @fn 			 Snv_Delay
+ *
+ * @brief			 This routine delay serial uart.
+ *
+ * input parameters
+ *
+ * @param       times - delay times.
+ *
+ * output parameters
+ *
+ * @param       None.
+ *
+ * @return		 None.
+ *
+ */
+void Snv_Delay(int times)
+{
+  while(times--)
+  {
+      int i=0;
+      for(i=6000;i>0;i--)
+      {
+				asm("nop");
+      }
+  }
 }
 
 /*********************************************************************
