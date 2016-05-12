@@ -113,8 +113,6 @@
 	#define CIPHER_TEXT_LENGTH 0
 #endif
 
-// Max wechat storage count
-#define WECHAT_AUTH_STORE_MAX                         	4
 
 #define SEND_HELLO_WECHAT "Hello, WeChat!"
 
@@ -171,7 +169,7 @@ wechat_info wechatinfo = {WECHAT_CMD_NULL, {NULL, 0}};
 const uint8 key[16] = DEVICE_KEY
 uint8 session_key[16] = {0};
 
-static attHandleValueInd_t wechatStoreAuth[WECHAT_AUTH_STORE_MAX];
+
 static uint8 wechatStoreStartIndex = 0;
 static uint8 wechatStoreIndex = 0;
 
@@ -262,6 +260,7 @@ static uint16 Wechat_get_md5(void)
 uint8 Wechat_Init( void )
 {
  	uint8 stat = SUCCESS;
+  osal_memset( wechatStoreAuth, 0, (sizeof(attHandleValueInd_t) * WECHAT_AUTH_STORE_MAX) );
   Wechat_state_reset();
 	stat = Wechat_get_md5();
 	return stat;
@@ -841,7 +840,7 @@ int8 Wechat_data_produce(void *args, uint8 **r_data, uint32 *r_len)
 				};
 			#endif
 
-			*r_len = epb_auth_request_pack_size(&authReq) + fix_head_len;
+			*r_len = (uint32)epb_auth_request_pack_size(&authReq) + fix_head_len;
 			*r_data = (uint8 *)osal_mem_alloc(*r_len);
 			if(!(*r_data))
 			{
@@ -858,7 +857,7 @@ int8 Wechat_data_produce(void *args, uint8 **r_data, uint32 *r_len)
 			}
 
 			fix_head.nCmdId = htons(ECI_req_auth);
-			fix_head.nLength = htons(*r_len);
+			fix_head.nLength = htons((uint16)*r_len);
 			fix_head.nSeq = htons(wechatSta.seq);
 			memcpy(*r_data, &fix_head, fix_head_len);
 			break;
@@ -1023,12 +1022,21 @@ int8 Wechat_data_produce(void *args, uint8 **r_data, uint32 *r_len)
  *
  * @return  none
  */
-static void WechatSendStoredAuth(void)
+void WechatSendStoredAuth(void)
 {
   // We connected to this peer before so send any stored measurements
   if (wechatStoreStartIndex != wechatStoreIndex)
   {
     attHandleValueInd_t *pStoreInd = &wechatStoreAuth[wechatStoreStartIndex];
+
+#if 0
+		NPI_Printf("\r\n##send %d[%d] wechat data: ", wechatStoreStartIndex, pStoreInd->len);
+		for(uint8 i=0;i> pStoreInd->len;++i)
+		{
+			NPI_Printf(" %x", pStoreInd->pValue[i]);
+		}
+		NPI_Printf("\r\n");
+#endif
 
     // Send wechat auth - can fail if not connected or CCC not enabled
     bStatus_t status = Wechat_Indicate( gapConnHandle, pStoreInd,
@@ -1037,7 +1045,11 @@ static void WechatSendStoredAuth(void)
     // will trigger the next indication if there are more pending.
     if (status == SUCCESS)
     {
-      wechatStoreStartIndex = wechatStoreStartIndex + 1;
+
+      // Clear out this Meas indication.
+      VOID osal_memset( pStoreInd, 0, sizeof(attHandleValueInd_t) );
+
+      wechatStoreStartIndex ++;
 
       // Wrap around buffer
       if (wechatStoreStartIndex > WECHAT_AUTH_STORE_MAX)
@@ -1045,16 +1057,21 @@ static void WechatSendStoredAuth(void)
         wechatStoreStartIndex = 0;
       }
 
-      // Clear out this Meas indication.
-      VOID osal_memset( pStoreInd, 0, sizeof(attHandleValueInd_t) );
-
-			NPI_Printf("WechatSendStoredAuth StartIndex %d indicate is seccess\r\n", wechatStoreStartIndex-1);
+			//osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_PERIODIC_EVT, SBP_PERIODIC_EVT_PERIOD );
     }
 		else
 		{
-			NPI_Printf("wechatSendStoredAuth StartIndex %d indicate is failed\r\n", wechatStoreStartIndex);
+			//osal_stop_timerEx( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT);
+			NPI_Printf("Send %d failed %d \r\n", wechatStoreStartIndex, status);
+			//osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_PERIODIC_EVT, SBP_PERIODIC_EVT_PERIOD );
 		}
   }
+	else
+	{
+		NPI_Printf("wechat send end,resend \r\n");
+		wechatStoreStartIndex = 0;
+		osal_stop_timerEx( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT);
+	}
 }
 
 /*********************************************************************
@@ -1064,34 +1081,68 @@ static void WechatSendStoredAuth(void)
  *
  * @return  none
  */
-static void wechatStoreIndications(attHandleValueInd_t *pInd)
+static void wechatStoreIndications(wechatValueInd_t *pInd)
 {
-  attHandleValueInd_t *pStoreInd = &wechatStoreAuth[wechatStoreIndex];
+	uint8 pStoreIndState=FAILURE;
+	
+	//attHandleValueInd_t *pStoreInd= &wechatStoreAuth[wechatStoreIndex];
 
-  if (pStoreInd->pValue != NULL)
-  {
-    // Free old indication's payload.
-    GATT_bm_free((gattMsg_t *)pStoreInd, ATT_HANDLE_VALUE_IND);
-  }
+	while( pInd->len && pStoreIndState)
+	{
+		attHandleValueInd_t *pStoreInd= &wechatStoreAuth[wechatStoreIndex];
+		pStoreInd->pValue = GATT_bm_alloc(gapConnHandle, ATT_HANDLE_VALUE_IND,
+                                           BLE_WECHAT_MAX_DATA_LEN, NULL);
 
-  // Store measurement
-  VOID osal_memcpy(&wechatStoreAuth[wechatStoreIndex], pInd, sizeof(attHandleValueInd_t));
+		if (pStoreInd->pValue != NULL)
+		{
+    	// Free old indication's payload.
+    	GATT_bm_free((gattMsg_t *)pStoreInd->pValue, ATT_HANDLE_VALUE_IND);
+		}
+		
+		if ( pInd->len <= BLE_WECHAT_MAX_DATA_LEN )
+		{		
+			wechatStoreAuth[wechatStoreIndex].len = pInd->len;		
+			osal_memcpy(wechatStoreAuth[wechatStoreIndex].pValue, pInd->pValue, pInd->len);
+			pStoreIndState=SUCCESS;
+		}
+		else
+		{
+			wechatStoreAuth[wechatStoreIndex].len = BLE_WECHAT_MAX_DATA_LEN;
+		  osal_memcpy(wechatStoreAuth[wechatStoreIndex].pValue, pInd->pValue, BLE_WECHAT_MAX_DATA_LEN);
+			pInd->pValue += BLE_WECHAT_MAX_DATA_LEN;
+			pInd->len -= BLE_WECHAT_MAX_DATA_LEN;
+		}
+		
+#if 0
+		NPI_Printf("\r\n##Store %d[%d] wechat data: ", wechatStoreIndex, wechatStoreAuth[wechatStoreIndex].len);
+		for(uint8 i=0;i > wechatStoreAuth[wechatStoreIndex].len;++i)
+		{
+			//NPI_Printf(" %x", wechatStoreAuth[wechatStoreIndex].pValue[i]);
+			NPI_Printf(" %x", wechatStoreAuth[wechatStoreIndex].pValue[i]);
+		}
+		NPI_Printf("\r\n");
+#endif
 
-  // Store index
-  wechatStoreIndex = wechatStoreIndex + 1;
-  if (wechatStoreIndex > WECHAT_AUTH_STORE_MAX)
-  {
-    wechatStoreIndex = 0;
-  }
+	  // Store index
+	  wechatStoreIndex ++;
+		
+	  if (wechatStoreIndex > WECHAT_AUTH_STORE_MAX)
+	  {
+	    wechatStoreIndex = 0;
+	  }
 
-  if (wechatStoreIndex == wechatStoreStartIndex)
-  {
-    wechatStoreStartIndex = wechatStoreStartIndex + 1;
-    if(wechatStoreStartIndex > WECHAT_AUTH_STORE_MAX)
-    {
-      wechatStoreStartIndex = 0;
-    }
-  }
+	  if (wechatStoreIndex == wechatStoreStartIndex)
+	  {
+	    wechatStoreStartIndex ++;
+	    if(wechatStoreStartIndex > WECHAT_AUTH_STORE_MAX)
+	    {
+	      wechatStoreStartIndex = 0;
+	    }
+	  }
+		
+		//NPI_Printf("send %d bytes, remaining %d bytes %d %d\r\n", pInd->buf_len, pInd->len, wechatStoreIndex, wechatStoreStartIndex);
+		//WechatSendStoredAuth();	//Less than 6ms		
+	}	
 }
 
  
@@ -1111,28 +1162,25 @@ static void wechatStoreIndications(attHandleValueInd_t *pInd)
 */
 int32 Wechat_device_auth(void)
 { 
-	//if (m_mpbledemo2_handler == NULL) {
-	//			m_mpbledemo2_handler = get_handler_by_type(PRODUCT_TYPE_MPBLEDEMO2);
-	//		}
 
-	// BloodPressure measurement value stored in this structure.
-  attHandleValueInd_t  wechatauth;
+	// wechat auth value stored in this structure.
+  wechatValueInd_t  wechatauth;
 
-  wechatauth.pValue = GATT_bm_alloc(gapConnHandle, ATT_HANDLE_VALUE_IND,
-                                           BLE_WECHAT_MAX_DATA_LEN, NULL);
+
   if (wechatauth.pValue != NULL)
-  {
+  { 
 		wechatauth.pValue = NULL;
 		wechatauth.len = 0;
 				
 		ARGS_ITEM_SET(wechat_info, &wechatinfo, cmd, WECHAT_CMD_AUTH); 
-		Wechat_data_produce(&wechatinfo, &wechatauth.pValue, (uint32 *)&wechatauth.len);
+		Wechat_data_produce(&wechatinfo, &wechatauth.pValue, &wechatauth.len);
 		if(wechatauth.pValue == NULL)
 		{
 			NPI_Printf("wechat Pack Error Code\r\n");
 			return (errorCodeProduce);
 		}
 
+#if 0
 		//sent data	
 		NPI_Printf("\r\n##send %d auth data: ", wechatauth.len);
 		for(uint8 i=0;i<wechatauth.len;++i)
@@ -1145,13 +1193,12 @@ int32 Wechat_device_auth(void)
 		NPI_Printf("CMDID: %d \r\n", ntohs(fix_head->nCmdId));
 		NPI_Printf("len: %d \r\n", ntohs(fix_head->nLength ));
 		NPI_Printf("Seq: %d \r\n", ntohs(fix_head->nSeq));
+#endif
 
-		//ble_wechat_indicate_data(p_wcs, m_mpbledemo2_handler, data, len);
-		//m_mpbledemo2_handler->m_data_free_func(data,len);
 		wechatStoreIndications(&wechatauth);
-		WechatSendStoredAuth();
-  }
-	
+		//WechatSendStoredAuth();
+	}
+
 	return 0;
 }
 
@@ -1173,20 +1220,16 @@ int32 Wechat_device_auth(void)
 */
 int32 Wechat_device_init(void)
 { 
-	//if (m_mpbledemo2_handler == NULL) {
-	//			m_mpbledemo2_handler = get_handler_by_type(PRODUCT_TYPE_MPBLEDEMO2);
-	//		}
-
-	// BloodPressure measurement value stored in this structure.
-  attHandleValueInd_t  wechatinit;
+	// wechat init value stored in this structure.
+  wechatValueInd_t  wechatinit;
 
   wechatinit.pValue = GATT_bm_alloc(gapConnHandle, ATT_HANDLE_VALUE_IND,
                                            BLE_WECHAT_MAX_DATA_LEN, NULL);
   if (wechatinit.pValue != NULL)
   {
-		//uint8 *data = NULL;
-		//uint32 len = 0;
-				
+		wechatinit.pValue = NULL;
+		wechatinit.len = 0;
+		
 		ARGS_ITEM_SET(wechat_info, &wechatinfo, cmd, WECHAT_CMD_INIT); 
 		Wechat_data_produce(&wechatinfo, &wechatinit.pValue, (uint32 *)&wechatinit.len);
 		if(wechatinit.pValue == NULL)
@@ -1208,10 +1251,8 @@ int32 Wechat_device_init(void)
 		NPI_Printf("len: %d \r\n", ntohs(fix_head->nLength ));
 		NPI_Printf("Seq: %d \r\n", ntohs(fix_head->nSeq));
 
-		//ble_wechat_indicate_data(p_wcs, m_mpbledemo2_handler, data, len);
-		//m_mpbledemo2_handler->m_data_free_func(data,len);
 		wechatStoreIndications(&wechatinit);
-		WechatSendStoredAuth();
+		//WechatSendStoredAuth();
   }
 	
 	return 0;
@@ -1240,7 +1281,7 @@ uint8 Wechat_device_test_senddat(void)
 	//		}
 
 	// BloodPressure measurement value stored in this structure.
-  attHandleValueInd_t  wechatauth;
+  wechatValueInd_t  wechatauth;
 
   wechatauth.pValue = GATT_bm_alloc(gapConnHandle, ATT_HANDLE_VALUE_IND,
                                            BLE_WECHAT_MAX_DATA_LEN, NULL);
@@ -1275,7 +1316,7 @@ uint8 Wechat_device_test_senddat(void)
 		//ble_wechat_indicate_data(p_wcs, m_mpbledemo2_handler, data, len);
 		//m_mpbledemo2_handler->m_data_free_func(data,len);
 		wechatStoreIndications(&wechatauth);
-		WechatSendStoredAuth();
+		//WechatSendStoredAuth();
   }
 	
 	return 0;

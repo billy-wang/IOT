@@ -7,12 +7,13 @@
 
 //  Version : 1.0.4
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <string.h>
 #include "epb_MmBp.h"
 #include "bcomdef.h"
 #include "OSAL.h"
+#include "npi.h"
 
 #define TAG_BaseResponse_ErrCode												0x08
 #define TAG_BaseResponse_ErrMsg													0x12
@@ -93,8 +94,8 @@ BaseResponse *epb_unpack_base_response(const uint8 *buf, int buf_len)
 	}
 
 	BaseResponse *response = (BaseResponse *)osal_mem_alloc(sizeof(BaseResponse));
-	memset(response, 0, sizeof(BaseResponse));
-	response->err_code = epb_get_int32(&epb, TAG_BaseResponse_ErrCode);
+	osal_memset(response, 0, sizeof(BaseResponse));
+        response->err_code = epb_get_int32(&epb, TAG_BaseResponse_ErrCode);
 	if (epb_has_tag(&epb, TAG_BaseResponse_ErrMsg)) {
 		response->err_msg.str = epb_get_string(&epb, TAG_BaseResponse_ErrMsg, &response->err_msg.len);
 		response->has_err_msg = true;
@@ -114,8 +115,8 @@ BasePush *epb_unpack_base_push(const uint8 *buf, int buf_len)
 	epb_unpack_init(&epb, buf, buf_len);
 
 	BasePush *push = (BasePush *)osal_mem_alloc(sizeof(BasePush));
-	memset(push, 0, sizeof(BasePush));
-
+	osal_memset(push, 0, sizeof(BasePush));
+        
 	return push;
 }
 
@@ -152,6 +153,8 @@ int epb_auth_request_pack_size(AuthRequest *request)
 	if (request->has_device_name) {
 		pack_size += epb_length_delimited_pack_size(TAG_AuthRequest_DeviceName, request->device_name.len);
 	}
+	
+	//NPI_Printf("epb pack size %d\r\n", pack_size);
 
 	return pack_size;
 }
@@ -231,7 +234,7 @@ AuthResponse *epb_unpack_auth_response(const uint8 *buf, int buf_len)
 	}
 
 	AuthResponse *response = (AuthResponse *)osal_mem_alloc(sizeof(AuthResponse));
-	memset(response, 0, sizeof(AuthResponse));
+	osal_memset(response, 0, sizeof(AuthResponse));
 	tmp = epb_get_message(&epb, TAG_AuthResponse_BaseResponse, &tmp_len);
 	response->base_response = epb_unpack_base_response(tmp, tmp_len);
 	if (response->base_response == NULL) {
@@ -316,7 +319,7 @@ InitResponse *epb_unpack_init_response(const uint8 *buf, int buf_len)
 	}
 
 	InitResponse *response = (InitResponse *)osal_mem_alloc(sizeof(InitResponse));
-	memset(response, 0, sizeof(InitResponse));
+	osal_memset(response, 0, sizeof(InitResponse));
 	tmp = epb_get_message(&epb, TAG_InitResponse_BaseResponse, &tmp_len);
 	response->base_response = epb_unpack_base_response(tmp, tmp_len);
 	if (response->base_response == NULL) {
@@ -432,7 +435,7 @@ SendDataResponse *epb_unpack_send_data_response(const uint8 *buf, int buf_len)
 	}
 
 	SendDataResponse *response = (SendDataResponse *)osal_mem_alloc(sizeof(SendDataResponse));
-	memset(response, 0, sizeof(SendDataResponse));
+	osal_memset(response, 0, sizeof(SendDataResponse));
 	tmp = epb_get_message(&epb, TAG_SendDataResponse_BaseResponse, &tmp_len);
 	response->base_response = epb_unpack_base_response(tmp, tmp_len);
 	if (response->base_response == NULL) {
@@ -469,7 +472,7 @@ RecvDataPush *epb_unpack_recv_data_push(const uint8 *buf, int buf_len)
 	}
 
 	RecvDataPush *push = (RecvDataPush *)osal_mem_alloc(sizeof(RecvDataPush));
-	memset(push, 0, sizeof(RecvDataPush));
+	osal_memset(push, 0, sizeof(RecvDataPush));
 	tmp = epb_get_message(&epb, TAG_RecvDataPush_BasePush, &tmp_len);
 	push->base_push = epb_unpack_base_push(tmp, tmp_len);
 	if (push->base_push == NULL) {
@@ -510,7 +513,7 @@ SwitchViewPush *epb_unpack_switch_view_push(const uint8 *buf, int buf_len)
 	}
 
 	SwitchViewPush *push = (SwitchViewPush *)osal_mem_alloc(sizeof(SwitchViewPush));
-	memset(push, 0, sizeof(SwitchViewPush));
+	osal_memset(push, 0, sizeof(SwitchViewPush));
 	tmp = epb_get_message(&epb, TAG_SwitchViewPush_BasePush, &tmp_len);
 	push->base_push = epb_unpack_base_push(tmp, tmp_len);
 	if (push->base_push == NULL) {
@@ -545,7 +548,7 @@ SwitchBackgroudPush *epb_unpack_switch_backgroud_push(const uint8 *buf, int buf_
 	}
 
 	SwitchBackgroudPush *push = (SwitchBackgroudPush *)osal_mem_alloc(sizeof(SwitchBackgroudPush));
-	memset(push, 0, sizeof(SwitchBackgroudPush));
+	osal_memset(push, 0, sizeof(SwitchBackgroudPush));
 	tmp = epb_get_message(&epb, TAG_SwitchBackgroudPush_BasePush, &tmp_len);
 	push->base_push = epb_unpack_base_push(tmp, tmp_len);
 	if (push->base_push == NULL) {

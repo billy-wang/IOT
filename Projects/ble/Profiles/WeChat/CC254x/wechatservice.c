@@ -124,7 +124,7 @@ static uint8 wechatWriteUserDesp[17] = "WechatWrite";
 // Wechat Indicate Characteristic
 static uint8 wechatIndicateProps = GATT_PROP_INDICATE;
 static gattCharCfg_t *wechatIndicateConfig;
-static uint8 wechatIndicate = 0;
+static uint8 wechatIndicate[20] = { 0 };
 static uint8 wechatIndicateUserDesp[17] = "WechatIndicate";
 
 
@@ -192,7 +192,7 @@ static gattAttribute_t wechatAttrTbl[] =
       { ATT_BT_UUID_SIZE, wechatIndicateUUID },
       0,
       0, 
-      &wechatIndicate 
+      wechatIndicate 
     },
 
     // 6.Indicate Characteristic Configuration
@@ -341,11 +341,18 @@ bStatus_t Wechat_SetParameter( uint8 param, uint8 len, void *value )
   switch ( param )
   {
   	case WECHAT_CMD_AUTH:
+			if ( len <= 20 ) 
+				osal_memcmp(wechatIndicate, value, len);
+			else
+				ret = bleInvalidRange;
 			break;
+			
 		case WECHAT_CMD_INIT:
 			break;
+			
 		case WECHAT_CMD_TEST_SENDDAT:
 			break;
+			
     default:
       ret = INVALIDPARAMETER;
       break;
@@ -373,6 +380,7 @@ bStatus_t Wechat_GetParameter( uint8 param, void *value )
   switch ( param )
   {
    	case WECHAT_CMD_AUTH:
+			osal_memcmp(value, wechatIndicate, 20);
 			break;
 		case WECHAT_CMD_INIT:
 			break;
@@ -505,7 +513,7 @@ static bStatus_t wechat_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
         {
           uint8 value = BUILD_UINT16( pValue[0], pValue[1] );
 					
-					value = GATT_CFG_NO_OPERATION ? WECHAT_INDICATE_DISABLED : WECHAT_INDICATE_ENABLED ;
+					value = (value == GATT_CFG_NO_OPERATION) ? WECHAT_INDICATE_DISABLED : WECHAT_INDICATE_ENABLED ;
           (*wechatServiceCB)( value, NULL, NULL, NULL);
         }
       }

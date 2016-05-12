@@ -71,10 +71,27 @@ do {	\
 
 #define CHALLENAGE_LENGTH 4
 
+// Max wechat storage count
+#define WECHAT_AUTH_STORE_MAX                         	10
+
+/*********************************************************************
+ *  VARIABLES
+ */
+static attHandleValueInd_t wechatStoreAuth[WECHAT_AUTH_STORE_MAX];
 
 /*********************************************************************
  * TYPEDEFS
  */
+
+typedef struct
+{
+  uint16 handle; //!< Handle of the attribute that has been changed (must be first field) 
+  uint16 offset; //!< Offset of the first octet to be written
+  uint32 len;     //!< Length of value
+  uint8 *pValue; //!< Current value of the attribute (0 to ATT_MTU_SIZE-3)
+  uint16 buf_len;
+} wechatValueInd_t;
+
 typedef struct
 {
 	unsigned char bMagicNumber;

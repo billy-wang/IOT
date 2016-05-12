@@ -272,7 +272,7 @@ void NPI_PrintString(uint8 *buf)
 {
 #if (HAL_UART== TRUE)
 	NPI_WriteTransport(buf, osal_strlen((char*)buf));
-	NPI_SerialDelay(10);
+	NPI_SerialDelay(1);
 #endif
 }
 

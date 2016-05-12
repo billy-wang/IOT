@@ -7,7 +7,7 @@
 
 //  Version : 1.0.2
 
-#include <string.h>
+//#include <string.h>
 //#include "hal_mcu.h"
 #include "epb.h"
 #include "bcomdef.h"

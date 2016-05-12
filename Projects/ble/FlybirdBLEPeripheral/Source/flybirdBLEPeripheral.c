@@ -93,10 +93,6 @@
 /*********************************************************************
  * CONSTANTS
  */
-
-// How often to perform periodic event
-#define SBP_PERIODIC_EVT_PERIOD                   9000
-
 // What is the advertising interval when device is discoverable (units of 625us, 160=100ms)
 #define DEFAULT_ADVERTISING_INTERVAL          160
 
@@ -378,7 +374,6 @@ static void bpStoreIndications(attHandleValueInd_t* pInd);
 static void bpSendStoredMeas();
 static void cuffMeas(void);
 static void simulateMeas( void );
-void Snv_Delay(int times);
 
 #if (defined HAL_KEY) && (HAL_KEY == TRUE)
 static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys );
@@ -390,6 +385,7 @@ static void DevPrivateCheck( void );
 static uint8 StorePrivateBDadd(void);
 static uint8 BondFindAddr( uint8 *pDevAddr );
 static uint8 RWFlashTest( void );
+void Snv_Delay(int times);
 
 /*********************************************************************
  * PROFILE CALLBACKS
@@ -633,9 +629,6 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
 
 #endif // defined ( DC_DC_P0_7 )
 
-  // Setup a delayed profile startup
-  osal_set_event( simpleBLEPeripheral_TaskID, SBP_START_DEVICE_EVT );
-
 #if (defined HAL_UART) && (HAL_UART == TRUE)
 	// Initialize uart
 	NPI_InitTransport(NpiSerialPeripheralCB);
@@ -648,7 +641,14 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
 	NPI_PrintString("\r\n");
 #endif
 
+  //turn on overlapped processing
+  HCI_EXT_HaltDuringRfCmd(HCI_EXT_HALT_DURING_RF_DISABLE);
+  HCI_EXT_OverlappedProcessingCmd(HCI_EXT_ENABLE_OVERLAPPED_PROCESSING);
+	
 	Wechat_Init();
+
+  // Setup a delayed profile startup
+  osal_set_event( simpleBLEPeripheral_TaskID, SBP_START_DEVICE_EVT );
 
 }
 
@@ -667,7 +667,7 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
  */
 uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
 {
-#if 1
+#if 0
 	NPI_PrintValue("ProcessEvent ", events, 16);
 	NPI_PrintString("\r\n");
 #endif
@@ -715,7 +715,7 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
     GAPBondMgr_Register( (gapBondCBs_t *) &timeApp_BondMgrCBs );
 
     // Set timer for first periodic event
-    osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_PERIODIC_EVT, SBP_PERIODIC_EVT_PERIOD );
+    //osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_PERIODIC_EVT, SBP_PERIODIC_EVT_PERIOD );
 
 		#if (defined HAL_LED) && (HAL_LED == TRUE)
 		// Set LED1 on to give feedback that the power is on, and a timer to turn off
@@ -744,7 +744,7 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
   ////////////////////////////////////////////////////////////////////
   if ( events & SBP_PERIODIC_EVT )
   {
-    // Restart timer
+		// Restart timer
     if ( SBP_PERIODIC_EVT_PERIOD )
     {
       osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_PERIODIC_EVT, SBP_PERIODIC_EVT_PERIOD );
@@ -804,7 +804,7 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
 		else
 		{
 			// Start timer to send final BP meas
-			osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_BPMEAS_EVT, TIMER_CUFF_PERIOD );
+			//osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_BPMEAS_EVT, TIMER_CUFF_PERIOD );
 		}
 
     return (events ^ SBP_TIMER_CUFF_EVT);
@@ -835,8 +835,16 @@ uint16 SimpleBLEPeripheral_ProcessEvent( uint8 task_id, uint16 events )
   {
     if (gapProfileState == GAPROLE_CONNECTED)
     {
-        //Wechat_device_auth();//send stored auth data
-        Wechat_main_process();
+    		// Restart timer
+	    if ( SBP_WECHAT_EVT_PERIOD )
+	    {
+	      osal_start_timerEx( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT, SBP_WECHAT_EVT_PERIOD );
+	    }
+
+			//Wechat_device_auth();//send stored auth data
+      //Wechat_main_process();
+      WechatSendStoredAuth();
+			//wechatSta.indication_state = true;
     }
 
     return (events ^ WECHAT_CCC_UPDATE_EVT);
@@ -1152,9 +1160,9 @@ static void simpleBLEPeripheral_ProcessGATTMsg( gattMsgEvent_t *pMsg )
 			HalLcdWriteString("Handle Ind", HAL_LCD_LINE_3 );
 			NPI_PrintString("Handle Ind\r\n");
 			break;
-		case ATT_HANDLE_VALUE_CFM :
+		case ATT_HANDLE_VALUE_CFM :	/* ICALL_EVENT_EVENT */
 			HalLcdWriteString("Handle Cfm", HAL_LCD_LINE_3 );
-			NPI_PrintString("Handle Cfm\r\n");
+			NPI_Printf("Handle Cfm event %x %d %d\r\n", pMsg->hdr.event, pMsg->hdr.status, pMsg->connHandle);
 			break;
 		case ATT_WRITE_CMD :
 			HalLcdWriteString("Write Command", HAL_LCD_LINE_3 );
@@ -1173,7 +1181,10 @@ static void simpleBLEPeripheral_ProcessGATTMsg( gattMsgEvent_t *pMsg )
   // Measurement Indication Confirmation
   if( pMsg->method == ATT_HANDLE_VALUE_CFM)
   {
-      bpSendStoredMeas();
+      //bpSendStoredMeas();
+      // Clear Service Changed flag for this client
+      //GAPBondMgr_ServiceChangeInd( pMsg->connHandle, 0x00 );
+			WechatSendStoredAuth();
   }
 
   if ( pMsg->method == ATT_HANDLE_VALUE_NOTI ||
@@ -1254,9 +1265,13 @@ static void timeAppDiscpostponed( void )
 		if ( timeAppBonded )
 		{
 			osal_memcpy( timeAppBondedAddr, pItem->addr, B_ADDR_LEN );
+#if 0
 			NPI_PrintString("Found ");
 			NPI_WriteTransport((uint8*)bdAddr2Str( timeAppBondedAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( timeAppBondedAddr )));
-			NPI_PrintString(" BondedAddr\r\n");
+			NPI_PrintString(" timeAppBondedAddr\r\n");
+#else
+			//NPI_Printf("Found %s timeAppBondedAddr\r\n", (uint8*)bdAddr2Str( timeAppBondedAddr ));
+#endif
 		}
 	}
 
@@ -1282,8 +1297,7 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 #ifdef PLUS_BROADCASTER
   static uint8 first_conn_flag = 0;
 #endif // PLUS_BROADCASTER
-  
-  
+
   switch ( newState )
   {
     case GAPROLE_STARTED:
@@ -1436,6 +1450,8 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
         HalLcdWriteString( "Disconnected",  HAL_LCD_LINE_3 );
 				NPI_PrintString("Disconnected\r\n");
 
+				Wechat_Init();
+
 				#if (defined HAL_LED) && (HAL_LED == TRUE)
 					// Turn off LED that shows we're advertising
 					HalLedSet( HAL_LED_2, HAL_LED_MODE_OFF );
@@ -1488,9 +1504,10 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
 		 //always stop intermediate timer
 		 //osal_stop_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT );
 
+#if 0
 		 // stop disconnect timer
 		 osal_stop_timerEx( simpleBLEPeripheral_TaskID, BP_DISCONNECT_PERIOD );
-
+#endif
 	 }
 
   gapProfileState = newState;
@@ -1519,7 +1536,7 @@ static void peripheralStateNotificationCB( gaprole_States_t newState )
  */
 static void performPeriodicTask( void )
 {
-  uint8 valueToCopy;
+	uint8 valueToCopy;
   uint8 stat;
 
   // Call to retrieve the value of the third characteristic in the profile
@@ -1667,8 +1684,12 @@ static void bpServiceCB(uint8 event)
   switch (event)
   {
     case BLOODPRESSURE_MEAS_NOTI_ENABLED:
-      osal_set_event( simpleBLEPeripheral_TaskID, SBP_CCC_UPDATE_EVT );
+      osal_set_event( simpleBLEPeripheral_TaskID, SBP_TIMER_BPMEAS_EVT);
       break;
+
+		case BLOODPRESSURE_IMEAS_NOTI_ENABLED:
+			osal_set_event( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT);
+			break;
 
     default:
       break;
@@ -1692,16 +1713,14 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 		case GAPBOND_PAIRING_STATE_STARTED:
 			timeAppPairingStarted = TRUE;
 
-			NPI_PrintString("Pairing started\r\n");
+			//NPI_PrintString("Pairing started\r\n");
 			break;
 			
 		case GAPBOND_PAIRING_STATE_COMPLETE:
-			timeAppPairingStarted = FALSE;
-			timeAppDiscPostponed = TRUE;
 			switch (status)
 			{
 				case SUCCESS :
-					NPI_PrintString("Pairing success\r\n");
+					//NPI_PrintString("Pairing success\r\n");
 					if( StorePrivateBDadd() == SUCCESS )
 					{
 						osal_start_timerEx( simpleBLEPeripheral_TaskID, SMP_BOND_EVT, 50);
@@ -1728,7 +1747,7 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 			switch (status)
 			{
 				case SUCCESS :
-					NPI_PrintString("Bonding success\r\n");
+					//NPI_PrintString("Bonding success\r\n");
 					osal_start_timerEx( simpleBLEPeripheral_TaskID, SMP_BOND_EVT, 50);
 					break;
 				default :
@@ -1739,8 +1758,11 @@ static void timeAppPairStateCB( uint16 connHandle, uint8 state, uint8 status )
 			}
 			
 		case GAPBOND_PAIRING_STATE_BOND_SAVED :
-			NPI_PrintString("Bonding record saved in NV\r\n");
-			timeAppDiscpostponed();
+			timeAppPairingStarted = FALSE;
+			timeAppDiscPostponed = TRUE;
+			//NPI_PrintString("Bonding record saved in NV\r\n");
+			if (PrivateStatus)
+				timeAppDiscpostponed();
 			break;
 			
 		default:
@@ -1809,12 +1831,19 @@ static void timeAppPasscodeCB( uint8 *deviceAddr, uint16 connectionHandle,
  */
 static void wechatServiceCB(uint8 event, uint8 *pValue, uint8 len, uint16 offset)
 {
+	uint8 wechatValue[20];
+
   switch (event)
   {
     case WECHAT_INDICATE_ENABLED :
-  		wechatSta.indication_state = true;
-      osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT );
+			if (gapProfileState == GAPROLE_CONNECTED)
+			{
+	  		wechatSta.indication_state = true;
+				Wechat_main_process();
+	      osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT );
+			}
       break;
+			
 		case WECHAT_INDICATE_DISABLED :
 			NPI_Printf("wechat indication disable!\r\n");
 			wechatSta.indication_state = false;
@@ -1822,10 +1851,11 @@ static void wechatServiceCB(uint8 event, uint8 *pValue, uint8 len, uint16 offset
 
 		case WECHAT_ON_WRITE :
 			if (gapProfileState == GAPROLE_CONNECTED)
-			{
+			{	
+				Wechat_GetParameter(WECHAT_ON_WRITE ,wechatValue);
 				Wechat_on_write(pValue, len, offset);
+				osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_WRITE_EVT );
 			}
-			osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_WRITE_EVT );
 			break;
 
     default:
@@ -1918,8 +1948,10 @@ static void bpFinalMeas(void)
     // send stored measurements
     bpSendStoredMeas();
 
+#if 0
     // start disconnect timer
     osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_DISCONNECT_EVT, BP_DISCONNECT_PERIOD );
+#endif
   }
 }
 
@@ -1932,9 +1964,6 @@ static void bpFinalMeas(void)
  */
 static void bpStoreIndications(attHandleValueInd_t *pInd)
 {
-	NPI_PrintValue("bpStoreIndications ", (uint16) pInd->pValue, 16);
-	NPI_PrintString("\r\n");
-
   attHandleValueInd_t *pStoreInd = &bpStoreMeas[bpStoreIndex];
 
   if (pStoreInd->pValue != NULL)
@@ -1945,6 +1974,15 @@ static void bpStoreIndications(attHandleValueInd_t *pInd)
 
   // Store measurement
   VOID osal_memcpy(&bpStoreMeas[bpStoreIndex], pInd, sizeof(attHandleValueInd_t));
+
+#if 1
+	NPI_Printf("\r\n##Store Meas %d[%d] data: ", bpStoreIndex, bpStoreMeas[bpStoreIndex].len);
+	for(uint8 i=0;i > bpStoreMeas[bpStoreIndex].len;++i)
+	{
+		NPI_Printf(" %x", bpStoreMeas[bpStoreIndex].pValue[i]);
+	}
+	NPI_Printf("\r\n");
+#endif
 
   // Store index
   bpStoreIndex = bpStoreIndex + 1;
@@ -1985,6 +2023,15 @@ static void bpSendStoredMeas(void)
     // will trigger the next indication if there are more pending.
     if (status == SUCCESS)
     {
+#if 1
+			NPI_Printf("\r\n##Send Meas %d[%d] data: ", bpStoreStartIndex, bpStoreMeas[bpStoreStartIndex].len);
+			for(uint8 i=0;i > bpStoreMeas[bpStoreStartIndex].len;++i)
+			{
+				NPI_Printf(" %x", bpStoreMeas[bpStoreStartIndex].pValue[i]);
+			}
+			NPI_Printf("\r\n");
+#endif
+
       bpStoreStartIndex = bpStoreStartIndex + 1;
 
       // Wrap around buffer
@@ -1996,13 +2043,10 @@ static void bpSendStoredMeas(void)
       // Clear out this Meas indication.
       VOID osal_memset( pStoreInd, 0, sizeof(attHandleValueInd_t) );
 
-			NPI_PrintValue("bpSendStoredMeas StartIndex", bpStoreStartIndex-1, 10);
-			NPI_PrintString(" indicate is seccess\r\n");
     }
 		else
 		{
-			NPI_PrintValue("bpSendStoredMeas StartIndex", bpStoreStartIndex, 10);
-			NPI_PrintString(" indicate is failed\r\n");
+			NPI_PrintString("bpSendStoredMeas indicate failed\r\n");
 		}
   }
 }
@@ -2097,17 +2141,20 @@ static void cuffMeas(void)
     if ( BloodPressure_IMeasNotify( gapConnHandle, &bloodPressureIMeas,
                                     simpleBLEPeripheral_TaskID ) != SUCCESS )
     {
-			NPI_PrintValue("send", (uint16)bloodPressureIMeas.pValue, 16);		
-			NPI_PrintValue(" len", (uint16)bloodPressureIMeas.len, 16);
-			NPI_PrintString(" bp notify is failed\r\n");
-			
+			NPI_Printf("\r\n##send bp cuffMeas [%d] notify data: failed\r\n", bloodPressureIMeas.len);
       GATT_bm_free( (gattMsg_t *)&bloodPressureIMeas, ATT_HANDLE_VALUE_NOTI );
     }
 		else
 		{
-			NPI_PrintValue("send", (uint16)bloodPressureIMeas.pValue, 16);		
-			NPI_PrintValue(" len", (uint16)bloodPressureIMeas.len, 16);
-			NPI_PrintString(" bp notify is seccess\r\n");
+#if 1
+			NPI_Printf("\r\n##send bp cuffMeas [%d] data: ", bloodPressureIMeas.len);
+			uint8 *d = bloodPressureIMeas.pValue;
+			for(uint8 i=0;i > bloodPressureIMeas.len;++i)
+			{
+				NPI_Printf(" %x", d[i]);
+			}
+			NPI_Printf("\r\n");
+#endif
 		}
   }
 }
@@ -2203,6 +2250,8 @@ static void DevPrivateCheck( void )
 	uint8 bondAddr[B_ADDR_LEN]				// Place to put the public address
 					= {0, 0, 0, 0, 0, 0};
 
+	return;
+	
 	ret=GAPRole_GetParameter( GAPROLE_CONN_BD_ADDR, publicAddr);
 	if (ret == SUCCESS )
 	{
@@ -2222,10 +2271,10 @@ static void DevPrivateCheck( void )
 					NPI_PrintString(" central device\r\n");
 
 					//start simulation timer (start --> cuff -->measurement ready)
-					//osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
+					osal_start_timerEx( simpleBLEPeripheral_TaskID, SBP_TIMER_CUFF_EVT, TIMER_CUFF_PERIOD );
 
 					//reset cuff count
-					//cuffCount = 0;
+					cuffCount = 0;					
 			}
 			else
 			{
@@ -2263,13 +2312,19 @@ static uint8 StorePrivateBDadd (void)
 	uint8 ret;
 	uint8 pDevAddr[B_ADDR_LEN]= {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-	Snv_Delay(3);
+/* for test fix snv read failed */
+#if 1
+	PrivateStatus = true;
+	return SUCCESS;
+#endif
+
+	//Snv_Delay(3);
 
 	ret=osal_snv_read( BLE_NVID_CUST_START, sizeof( ConnectedWhiteListDevAddr), ConnectedWhiteListDevAddr);
 	if ( ret == SUCCESS )
 	{
-		NPI_WriteTransport((uint8*)bdAddr2Str( ConnectedWhiteListDevAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( ConnectedWhiteListDevAddr )));
-		NPI_PrintString(" ] whielistdevadd\r\n");
+		//NPI_WriteTransport((uint8*)bdAddr2Str( ConnectedWhiteListDevAddr ), (uint8)osal_strlen( (char*)bdAddr2Str( ConnectedWhiteListDevAddr )));
+		//NPI_PrintString(" ] whielistdevadd\r\n");
 
 		if(osal_memcmp( ConnectedWhiteListDevAddr, pDevAddr, B_ADDR_LEN )) // first bond 
 		{
@@ -2291,9 +2346,15 @@ static uint8 StorePrivateBDadd (void)
 		}
 		else
 		{
-			NPI_PrintString("snv read failed\r\n");
+			NPI_Printf("%s has been binding\r\n", (uint8*)bdAddr2Str( ConnectedWhiteListDevAddr ));
 			GAPRole_TerminateConnection();
+			return FAILURE;
 		}
+	}
+	else
+	{
+		NPI_Printf("snv read failed!!\r\n");
+		return FAILURE;
 	}
 }
 

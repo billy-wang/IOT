@@ -74,7 +74,7 @@ extern "C"
 #define WECHAT_CMD_TEST_SENDDAT					6
 #define WECHAT_ON_WRITE									7
 
-#define BLE_WECHAT_MAX_DATA_LEN            (ATT_MTU_SIZE- 3)
+#define BLE_WECHAT_MAX_DATA_LEN            (ATT_MTU_SIZE- 3) //ATT_MAX_MTU_SIZE
 
 /*********************************************************************
  * TYPEDEFS

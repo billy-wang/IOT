@@ -52,11 +52,18 @@ extern "C"
 /*********************************************************************
  * CONSTANTS
  */
+	
+//#define testsendData
+
 //#define SUPPORTSIMPLEPROFILE
 
 //#define SUPPORTBLOODPRESSURE
 
 //#define SUPPORTWECHAT
+
+// How often to perform periodic event
+#define SBP_PERIODIC_EVT_PERIOD                   500
+#define SBP_WECHAT_EVT_PERIOD                   	1000
 
 // Simple BLE Peripheral Task Events
 #define SBP_START_DEVICE_EVT                              0x0001
@@ -112,6 +119,8 @@ extern void Wechat_main_process(void);
 extern void Wechat_on_write(uint8 *pValue, uint8 len, uint16 offset);
 
 extern uint8 Wechat_device_test_senddat(void);
+
+extern void WechatSendStoredAuth(void);
 
 
 /*********************************************************************
