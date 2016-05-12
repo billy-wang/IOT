@@ -338,6 +338,7 @@ extern void Wechat_Register( wechatServiceCB_t pfnServiceCB )
 bStatus_t Wechat_SetParameter( uint8 param, uint8 len, void *value )
 {
   bStatus_t ret = SUCCESS;
+	NPI_Printf("set param %d %d\r\n", param, len);
   switch ( param )
   {
   	case WECHAT_CMD_AUTH:
@@ -377,6 +378,7 @@ bStatus_t Wechat_SetParameter( uint8 param, uint8 len, void *value )
 bStatus_t Wechat_GetParameter( uint8 param, void *value )
 {
   bStatus_t ret = SUCCESS;
+	NPI_Printf("get param %d\r\n", param);
   switch ( param )
   {
    	case WECHAT_CMD_AUTH:
@@ -441,10 +443,12 @@ static bStatus_t wechat_ReadAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
                                           uint8 maxLen, uint8 method )
 {
   bStatus_t status = SUCCESS;
+	NPI_Printf("Read %d %d %d\r\n", *pLen, pAttr->type.len, offset);
 
   // If attribute permissions require authorization to read, return error
   if ( gattPermitAuthorRead( pAttr->permissions ) )
   {
+  	NPI_Printf("not permissions read\r\n");
     // Insufficient authorization
     return ( ATT_ERR_INSUFFICIENT_AUTHOR );
   }
@@ -461,13 +465,18 @@ static bStatus_t wechat_ReadAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
     uint16 uuid = BUILD_UINT16( pAttr->type.uuid[0], pAttr->type.uuid[1]);
     switch ( uuid )
     {
-
       case WECHAT_READ_CHAR_UUID:
         {
-          *pLen = 2;
-          pValue[0] = 0;
-          pValue[1] = 0;
-          }
+#if 0					
+					NPI_Printf("Read %d", *pLen);
+					for(uint8 i=0; i<*pLen; i++)
+					{
+						NPI_Printf(" %x", *pLen);
+					}
+					NPI_Printf("\r\n");
+#endif					
+					osal_memcpy( pValue, pAttr->pValue, pAttr->type.len );
+        }
         break;         
       default:
         // Should never get here! (characteristics 3 and 4 do not have read permissions)
@@ -498,12 +507,14 @@ static bStatus_t wechat_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
                                             uint8 method )
 {
   bStatus_t status = SUCCESS;
- 
+
   uint16 uuid = BUILD_UINT16( pAttr->type.uuid[0], pAttr->type.uuid[1]);
+	
   switch ( uuid )
   {
     case GATT_CLIENT_CHAR_CFG_UUID :
 		{
+			NPI_Printf("indicate config \r\n");
       if ( pAttr->handle == wechatAttrTbl[WECHAT_INDICATE_CONFIG_POS].handle )
       {
         // BloodPressure Indications
@@ -519,6 +530,7 @@ static bStatus_t wechat_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
       }
       else
       {
+      	NPI_Printf("err: cfg invalid handle\r\n");
         status = ATT_ERR_INVALID_HANDLE;
       }
       break;     
@@ -526,18 +538,25 @@ static bStatus_t wechat_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
 
 		case WECHAT_WRITE_CHAR_UUID:
 		{
+			NPI_Printf("write \r\n");
+#if 1
+			(*wechatServiceCB)( WECHAT_ON_WRITE, pValue, len, offset);
+#else
       if ( pAttr->handle == wechatAttrTbl[WECHAT_WRITE_POS].handle )
       {
       	(*wechatServiceCB)( WECHAT_ON_WRITE, pValue, len, offset);
 			}
 			else
 			{
+				NPI_Printf("err: invalid handle\r\n");
 				status = ATT_ERR_INVALID_HANDLE;
 			}
+#endif
 			break;
 		}
 		
     default:
+			NPI_Printf("err: attr not found!\r\n");
       status = ATT_ERR_ATTR_NOT_FOUND;
       break;
   }

@@ -179,6 +179,7 @@ static uint8 wechatStoreIndex = 0;
 //static void simpleBLEPeripheral_ProcessOSALMsg( osal_event_hdr_t *pMsg );
 
 static void Wechat_state_reset(void);
+static void wechat_get_mac_addr(uint8 *mac_address);
 static uint16 Wechat_get_md5(void);
 static int8 Wechat_data_produce(void *args, uint8 **r_data, uint32 *r_len);
 
@@ -210,6 +211,17 @@ static void Wechat_state_reset(void)
 	wechatSta.send_data_seq = 0;
 	wechatSta.push_data_seq = 0;
 	wechatSta.seq = 0;
+}
+
+static void wechat_get_mac_addr(uint8 *mac_address)
+{
+	uint8 ownAddress[B_ADDR_LEN];
+	GAPRole_GetParameter(GAPROLE_BD_ADDR, ownAddress);
+	for ( uint8 i = 6; i > 0; )
+	{
+		i--;
+		mac_address[5-i]= ownAddress[i];
+	}
 }
 
 /**@brief   Function for the light initialization.
@@ -310,6 +322,7 @@ static void wechat_error_chack(int error_code)
 			NPI_Printf("error: userExitWxAccount\r\n");
 			break ;
 		default:
+			osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_WRITE_EVT );
 			break ;
 	}
 	//please reset  ble device
@@ -334,7 +347,7 @@ void Wechat_on_write(uint8 *pValue, uint8 len, uint16 offset)
 	int error_code;	
 	int chunk_size = 0;
 
-	//if ( len <= BLE_WECHAT_MAX_DATA_LEN ) 
+	if ( len <= BLE_WECHAT_MAX_DATA_LEN ) 
 	{
 		if (g_rcv_data.len == 0) 
 		{
@@ -375,7 +388,7 @@ int wechat_data_consume(data_info g_rcv_data)
 	{
 		NPI_Printf(" %x",g_rcv_data.data[i]);
 	}
-	NPI_Printf("\r\n CMDID: %d \r\n", ntohs(fix_head->nCmdId));
+	NPI_Printf("\r\nCMDID: %d \r\n", ntohs(fix_head->nCmdId));
 	NPI_Printf("len: %d \r\n", ntohs(fix_head->nLength));
 	NPI_Printf("Seq: %d \r\n",ntohs(fix_head->nSeq));
 
@@ -518,7 +531,7 @@ int wechat_data_consume(data_info g_rcv_data)
 				return errorCodeUnpackInitResp;
 			}
 
-			NPI_Printf("\r\n unpack 'initResp' success!");
+			NPI_Printf("\r\n unpack 'initResp' success!\r\n");
 			if(initResp->base_response)
 			{
 				if(initResp->base_response->err_code == 0)
@@ -797,8 +810,7 @@ int8 Wechat_data_produce(void *args, uint8 **r_data, uint32 *r_len)
 				
 			#if defined EAM_macNoEncrypt
 			static uint8 mac_address[MAC_ADDRESS_LENGTH];
-			//get_mac_addr(mac_address);
-			bdAddr2Str( mac_address );
+			wechat_get_mac_addr(mac_address);
 			AuthRequest authReq = {
 				&basReq, 
 				false,
@@ -1068,8 +1080,9 @@ void WechatSendStoredAuth(void)
   }
 	else
 	{
-		NPI_Printf("wechat send end,resend \r\n");
-		wechatStoreStartIndex = 0;
+		NPI_Printf("wechat send end\r\n");
+		wechatStoreIndex=0;
+		wechatStoreStartIndex=0;
 		osal_stop_timerEx( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT);
 	}
 }
@@ -1142,7 +1155,8 @@ static void wechatStoreIndications(wechatValueInd_t *pInd)
 		
 		//NPI_Printf("send %d bytes, remaining %d bytes %d %d\r\n", pInd->buf_len, pInd->len, wechatStoreIndex, wechatStoreStartIndex);
 		//WechatSendStoredAuth();	//Less than 6ms		
-	}	
+	}
+	osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT );
 }
 
  

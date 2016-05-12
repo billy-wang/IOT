@@ -267,7 +267,10 @@ static uint8 advertData[] =
 	//self data
 	0x11,
 	GAP_ADTYPE_MANUFACTURER_SPECIFIC,
-	0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0xbc,0x6a,0x29,0xac,0x1d,0x3f
+	0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+	// mac addr for iOS wechat
+	0x0,0x0,0x0,0x0,0x0,0x0
+	//0xbc,0x6a,0x29,0xac,0x1d,0x3f
 };
 
 // GAP GATT Attributes
@@ -379,6 +382,7 @@ static void simulateMeas( void );
 static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys );
 #endif
 
+static void Read_Mac(uint8 *ownAddress);
 char *bdAddr2Str ( uint8 *pAddr );
 
 static void DevPrivateCheck( void );
@@ -477,6 +481,12 @@ void SimpleBLEPeripheral_Init( uint8 task_id )
       uint8 initial_advertising_enable = TRUE;
     #endif
 
+		uint8 ownAddress[B_ADDR_LEN];
+		uint8 len = sizeof(advertData) - B_ADDR_LEN;
+		//GAPRole_GetParameter(GAPROLE_BD_ADDR, ownAddress);
+		Read_Mac( ownAddress );
+		osal_memcpy(advertData + len, ownAddress, B_ADDR_LEN);
+		
     // By setting this to zero, the device will go into the waiting state after
     // being discoverable for 30.72 second, and will not being advertising again
     // until the enabler is set back to TRUE
@@ -1840,7 +1850,7 @@ static void wechatServiceCB(uint8 event, uint8 *pValue, uint8 len, uint16 offset
 			{
 	  		wechatSta.indication_state = true;
 				Wechat_main_process();
-	      osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT );
+	      //osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT );
 			}
       break;
 			
@@ -1854,7 +1864,7 @@ static void wechatServiceCB(uint8 event, uint8 *pValue, uint8 len, uint16 offset
 			{	
 				Wechat_GetParameter(WECHAT_ON_WRITE ,wechatValue);
 				Wechat_on_write(pValue, len, offset);
-				osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_WRITE_EVT );
+				//osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_WRITE_EVT );
 			}
 			break;
 
@@ -2197,6 +2207,23 @@ static void simulateMeas( void )
     else
       bpUserId =1;
   }
+}
+
+/*********************************************************************
+ * @fn      Read_Mac
+ *
+ * @brief   Read Bluetooth address from chip register address.
+ *
+ * @return  none
+ */
+static void Read_Mac(uint8 *ownAddress)
+{
+	ownAddress[5] = *(uint8 *)(0x780E);
+	ownAddress[4] = *(uint8 *)(0x780F); 	 
+	ownAddress[3] = *(uint8 *)(0x7810); 	 
+	ownAddress[2] = *(uint8 *)(0x7811);
+	ownAddress[1] = *(uint8 *)(0x7812); 	 
+	ownAddress[0] = *(uint8 *)(0x7813); 	
 }
 
 /*********************************************************************
