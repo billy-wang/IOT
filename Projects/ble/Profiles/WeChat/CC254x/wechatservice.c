@@ -514,7 +514,6 @@ static bStatus_t wechat_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
   {
     case GATT_CLIENT_CHAR_CFG_UUID :
 		{
-			NPI_Printf("indicate config \r\n");
       if ( pAttr->handle == wechatAttrTbl[WECHAT_INDICATE_CONFIG_POS].handle )
       {
         // BloodPressure Indications
@@ -538,7 +537,6 @@ static bStatus_t wechat_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
 
 		case WECHAT_WRITE_CHAR_UUID:
 		{
-			NPI_Printf("write \r\n");
 #if 1
 			(*wechatServiceCB)( WECHAT_ON_WRITE, pValue, len, offset);
 #else

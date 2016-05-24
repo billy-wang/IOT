@@ -28,18 +28,28 @@ static uint32 crc_table(uint32 index)
 	return c;
 }
 
-uint32 crc32(uint32 crc, const uint8 *buf, int len)
+uint32 crc32(uint32 crc, const uint8 *buf, uint8 len)
 {
     if (buf == NULL) return 0L;
 
+		//NPI_Printf("crc%d %d\r\n", crc, len);
+
     crc = crc ^ 0xffffffffL;
+
     while (len >= 8)
     {
       DO8(buf);
+			//NPI_Printf("## crc%d %d\r\n", crc, len);
       len -= 8;
     }
-    if (len) do {
-      DO1(buf);
-    } while (--len);
+		
+    if (len)
+    {
+			do 
+			{
+      	DO1(buf);
+    	} while (--len);
+    }
+		
     return crc ^ 0xffffffffL;
 }

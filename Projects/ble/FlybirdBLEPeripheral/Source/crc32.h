@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-    uint32 crc32(uint32 crc, const uint8 *buf, int len);
+    uint32 crc32(uint32 crc, const uint8 *buf, uint8 len);
 
 #ifdef __cplusplus
 }

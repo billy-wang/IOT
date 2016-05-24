@@ -989,7 +989,7 @@ static void simpleBLEPeripheral_HandleKeys( uint8 shift, uint8 keys )
 		HalLcdWriteString( "JOY DOWN Press", HAL_LCD_LINE_3 );
 		NPI_PrintString( "JOY DOWN Press\r\n");
 
-		Wechat_device_test_senddat();
+		Wechat_device_test_senddata();
   }
 
   if ( keys & HAL_KEY_SW_7 )
@@ -1862,7 +1862,7 @@ static void wechatServiceCB(uint8 event, uint8 *pValue, uint8 len, uint16 offset
 		case WECHAT_ON_WRITE :
 			if (gapProfileState == GAPROLE_CONNECTED)
 			{	
-				Wechat_GetParameter(WECHAT_ON_WRITE ,wechatValue);
+				//Wechat_GetParameter(WECHAT_ON_WRITE ,wechatValue);
 				Wechat_on_write(pValue, len, offset);
 				//osal_set_event( simpleBLEPeripheral_TaskID, WECHAT_WRITE_EVT );
 			}

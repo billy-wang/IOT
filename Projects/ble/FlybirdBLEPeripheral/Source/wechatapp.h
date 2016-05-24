@@ -63,8 +63,8 @@ do {	\
 } while(0)
 
 //#define EAM_md5AndNoEnrypt 1     //认证方式只能定义其中的一种
-//#define EAM_md5AndAesEnrypt 1
-#define EAM_macNoEncrypt 2 
+#define EAM_md5AndAesEnrypt 1
+//#define EAM_macNoEncrypt 2 
 
 #define DEVICE_TYPE "gh_1bafe245c2cb"
 #define DEVICE_ID "WeChatBluetoothDevice"

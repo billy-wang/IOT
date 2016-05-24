@@ -152,7 +152,7 @@ extern uint8 simpleBLEPeripheral_TaskID;
 extern void* memcpy(void *dest, const void *src, size_t len);
 extern char *bdAddr2Str( uint8 *pAddr );
 
-extern uint32 crc32(uint32 crc, const uint8 *buf, int len);
+extern uint32 crc32(uint32 crc, const uint8 *buf, uint8 len);
 
 
 
@@ -245,11 +245,13 @@ static uint16 Wechat_get_md5(void)
 	
 	stat = md5(argv, md5_type_and_id);
 
+#if 0
 	NPI_Printf( "\r\nDEVICE_TYPE and DEVICE_ID: %s\r\n",argv);
 	NPI_PrintString ( "\r\nMD5:");
 	for ( uint8 i = 0; i < 16; i++ )
 		NPI_Printf ( " %02x", md5_type_and_id[i] );
 	NPI_PrintString( "\r\n" );
+#endif
 
 	#endif
 
@@ -383,6 +385,7 @@ int wechat_data_consume(data_info g_rcv_data)
 	BpFixHead *fix_head = (BpFixHead *)g_rcv_data.data;
 	uint8 fix_head_len = sizeof(BpFixHead);
 
+#if 0
 	NPI_Printf("##Received data: ");
 	for(uint8 i=0;i<g_rcv_data.len;++i)
 	{
@@ -391,6 +394,7 @@ int wechat_data_consume(data_info g_rcv_data)
 	NPI_Printf("\r\nCMDID: %d \r\n", ntohs(fix_head->nCmdId));
 	NPI_Printf("len: %d \r\n", ntohs(fix_head->nLength));
 	NPI_Printf("Seq: %d \r\n",ntohs(fix_head->nSeq));
+#endif
 
 	switch(ntohs(fix_head->nCmdId))
 	{
@@ -597,13 +601,13 @@ int wechat_data_consume(data_info g_rcv_data)
 			RecvDataPush *recvDatPush;
 			recvDatPush = epb_unpack_recv_data_push(g_rcv_data.data+fix_head_len, g_rcv_data.len-fix_head_len);
 
-			NPI_Printf("\r\n@@Received 'recvDataPush'\r\n");
+			//NPI_Printf("\r\n@@Received 'recvDataPush'\r\n");
 
 			if(!recvDatPush)
 			{
 				return errorCodeUnpackRecvDataPush;
 			}
-
+#if 0
 			NPI_Printf("\r\n unpack the 'recvDataPush' successfully! \r\n");
 			if(recvDatPush->base_push == NULL)
 			{
@@ -613,6 +617,7 @@ int wechat_data_consume(data_info g_rcv_data)
 			{
 				NPI_Printf("\r\n recvDatPush->base_push is not NULL! \r\n");
 			}
+
 			NPI_Printf("\r\n recvDatPush->data.len: %x \r\n",recvDatPush->data.len);
 			NPI_Printf("\r\n recvDatPush->data.data:  \r\n");
 			
@@ -626,15 +631,16 @@ int wechat_data_consume(data_info g_rcv_data)
 				NPI_Printf("\r\n recvDatPush has type! \r\n");
 				NPI_Printf("\r\n type: %d\r\n",recvDatPush->type);
 			}
-
+#endif
 			WechatBlueDemoHead *bledemohead = (WechatBlueDemoHead*)recvDatPush->data.data;
+#if 0
 			NPI_Printf("\r\n magicCode: %x",bledemohead->m_magicCode[0]);
 			NPI_Printf(" %x",bledemohead->m_magicCode[1]);
 			NPI_Printf("\r\n version: %x",ntohs(bledemohead->m_version));
 			NPI_Printf("\r\n totalLength: %x",ntohs(bledemohead->m_totalLength));
 			NPI_Printf("\r\n cmdid: %x",ntohs(bledemohead->m_cmdid ));
 			NPI_Printf("\r\n errorCode: %x",ntohs(bledemohead->m_errorCode));
-
+#endif
 			if(ntohs(bledemohead->m_cmdid ) == openLightPush)
 			{
 				NPI_Printf("\r\n light on!! ");				
@@ -773,6 +779,7 @@ int8 Wechat_data_produce(void *args, uint8 **r_data, uint32 *r_len)
 			memcpy(data+id_len+4,(uint8*)&seq,4);
 			uint32 crc = crc32(0, data, id_len+8);
 			crc = t_htonl(crc);
+			NPI_Printf("Wechat_data_produce 0x%x!\r\n", crc);
 			osal_memset(data,0x00,id_len+8);
 			memcpy(data,(uint8*)&ran,4);
 			memcpy(data+4,(uint8*)&seq,4);
@@ -927,7 +934,7 @@ int8 Wechat_data_produce(void *args, uint8 **r_data, uint32 *r_len)
 		}
 		case WECHAT_CMD_TEST_SENDDAT:
 		{
-			NPI_Printf("test msg to send : %s \r\n",(uint8*)info->send_msg.str);
+			//NPI_Printf("test msg to send : %s \r\n",(uint8*)info->send_msg.str);
 			
 			WechatBlueDemoHead  *bleDemoHead = (WechatBlueDemoHead*)osal_mem_alloc(bleDemoHeadLen+info->send_msg.len);
 			if(!bleDemoHead)
@@ -1080,7 +1087,7 @@ void WechatSendStoredAuth(void)
   }
 	else
 	{
-		NPI_Printf("wechat send end\r\n");
+		//NPI_Printf("wechat send end\r\n");
 		wechatStoreIndex=0;
 		wechatStoreStartIndex=0;
 		osal_stop_timerEx( simpleBLEPeripheral_TaskID, WECHAT_CCC_UPDATE_EVT);
@@ -1180,7 +1187,6 @@ int32 Wechat_device_auth(void)
 	// wechat auth value stored in this structure.
   wechatValueInd_t  wechatauth;
 
-
   if (wechatauth.pValue != NULL)
   { 
 		wechatauth.pValue = NULL;
@@ -1194,7 +1200,7 @@ int32 Wechat_device_auth(void)
 			return (errorCodeProduce);
 		}
 
-#if 0
+#if 1
 		//sent data	
 		NPI_Printf("\r\n##send %d auth data: ", wechatauth.len);
 		for(uint8 i=0;i<wechatauth.len;++i)
@@ -1252,6 +1258,7 @@ int32 Wechat_device_init(void)
 			return (errorCodeProduce);
 		}
 
+#if 0
 		//sent data	
 		NPI_Printf("\r\n##send %d init data: ", wechatinit.len);
 		for(uint8 i=0;i<wechatinit.len;++i)
@@ -1264,6 +1271,7 @@ int32 Wechat_device_init(void)
 		NPI_Printf("CMDID: %d \r\n", ntohs(fix_head->nCmdId));
 		NPI_Printf("len: %d \r\n", ntohs(fix_head->nLength ));
 		NPI_Printf("Seq: %d \r\n", ntohs(fix_head->nSeq));
+#endif
 
 		wechatStoreIndications(&wechatinit);
 		//WechatSendStoredAuth();
@@ -1275,7 +1283,7 @@ int32 Wechat_device_init(void)
 
  
 /*********************************************************************
-* @fn 		 Wechat_device_test_senddat
+* @fn 		 Wechat_device_test_senddata
 *
 * @brief	 Perform a periodic application task. This function gets
 * 				 called every five seconds as a result of the SBP_PERIODIC_EVT
@@ -1288,13 +1296,13 @@ int32 Wechat_device_init(void)
 *
 * @return  none
 */
-uint8 Wechat_device_test_senddat(void)
+uint8 Wechat_device_test_senddata(void)
 { 
 	//if (m_mpbledemo2_handler == NULL) {
 	//			m_mpbledemo2_handler = get_handler_by_type(PRODUCT_TYPE_MPBLEDEMO2);
 	//		}
 
-	// BloodPressure measurement value stored in this structure.
+	// wechat test value stored in this structure.
   wechatValueInd_t  wechatauth;
 
   wechatauth.pValue = GATT_bm_alloc(gapConnHandle, ATT_HANDLE_VALUE_IND,
@@ -1314,8 +1322,9 @@ uint8 Wechat_device_test_senddat(void)
 			return (errorCodeProduce);
 		}
 
+#if 0
 		//sent data	
-		NPI_Printf("\r\n##send %d data: ", wechatauth.len);
+		NPI_Printf("\r\n##send %d test data: ", wechatauth.len);
 		for(uint8 i=0;i<wechatauth.len;++i)
 		{
 			NPI_Printf(" %x",wechatauth.pValue[i]);
@@ -1326,9 +1335,8 @@ uint8 Wechat_device_test_senddat(void)
 		NPI_Printf("CMDID: %d \r\n", ntohs(fix_head->nCmdId));
 		NPI_Printf("len: %d \r\n", ntohs(fix_head->nLength ));
 		NPI_Printf("Seq: %d \r\n", ntohs(fix_head->nSeq));
+#endif
 
-		//ble_wechat_indicate_data(p_wcs, m_mpbledemo2_handler, data, len);
-		//m_mpbledemo2_handler->m_data_free_func(data,len);
 		wechatStoreIndications(&wechatauth);
 		//WechatSendStoredAuth();
   }
